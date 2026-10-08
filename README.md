@@ -37,14 +37,14 @@ The build is a multi-module Maven reactor, mirroring PME's structure:
 
 | Module | Contents |
 |---|---|
-| `common` | Shared value types, the PME-style `VersionIncrementer` (version math), and the Dependency Analyzer REST translator. |
+| `common` | Shared value types, the PME-style `VersionIncrementer` (version math), and the Dependency Analyzer REST translator. Request/response model types come from [`da:reports-model`](https://github.com/project-ncl/dependency-analysis) so the wire format stays consistent with PME and GME. |
 | `core` | The Ant-tree manipulators — GAV resolution/correlation, version reconciliation, the formatting-preserving rewriter — plus the alignment report. |
 | `cli` | The picocli entry point; builds the self-contained (shaded) executable jar. |
 | `integration-test` | End-to-end tests that drive the assembled pipeline against fixture Ant projects. |
 
 ## Requirements
 
-- Java 17+ to build (compile target is Java 8, matching PME)
+- **JDK 17+** to build (Spotless 2.44.x requires Java 17; the compile target is Java 8, matching PME)
 - Maven 3.8+
 
 ## Building
@@ -67,16 +67,15 @@ string is portable across all three tools. Only `-f`, `-d`, and `--preview` are 
 java -jar cli/target/ant-manipulation-cli.jar -f /path/to/build.xml
 
 # Align against a DA lookup service and apply the rewrites in place (like PME/GME, this is the default)
+# restMode defaults to PERSISTENT when not supplied
 java -jar cli/target/ant-manipulation-cli.jar -f /path/to/build.xml \
   -DrestURL=https://da.example.com/rest/v-1 \
-  -DrestMode=PERSISTENT \
   -DversionIncrementalSuffix=redhat \
   -DrestHeaders="Authorization:Bearer $TOKEN"
 
 # Same, but only preview the rewrites without touching any files
 java -jar cli/target/ant-manipulation-cli.jar -f /path/to/build.xml \
   -DrestURL=https://da.example.com/rest/v-1 \
-  -DrestMode=PERSISTENT \
   -DrestHeaders="Authorization:Bearer $TOKEN" \
   --preview
 ```
@@ -96,10 +95,10 @@ REST/DA and version keys match PME/GME verbatim; `restURL` enables alignment whe
 | Property | Description | Default |
 |---|---|---|
 | `restURL` | DA lookup service base URL; when set, coordinates are aligned | — |
-| `restMode` | DA lookup mode (e.g. `PERSISTENT`, `TEMPORARY`) | — |
+| `restMode` | DA lookup mode (`PERSISTENT`, `TEMPORARY`, …) | `PERSISTENT` |
 | `restHeaders` | Request headers as comma-separated `name:value` pairs (auth token goes here) | — |
-| `restBrewPullActive` | Enable DA brew-pull for the lookup | — |
-| `restSocketTimeout` | Lookup read/socket timeout in seconds | Unirest default |
+| `restBrewPullActive` | Enable DA brew-pull for the lookup | `false` |
+| `restSocketTimeout` | Lookup read/socket timeout in seconds | Unirest default (~10 s) |
 | `versionIncrementalSuffix` | Rebuild suffix inserted before the serial (`1.2.3.<suffix>-00001`) | `redhat` |
 | `versionIncrementalSuffixPadding` | Zero-padding width of the rebuild serial | `5` |
 | `versionSuffixStrip` | Dev markers stripped like `-SNAPSHOT` (comma-separated; e.g. `dev` collapses Tomcat's `10.1.0-dev` to `10.1.0.redhat-00001`). Opt-in. antalignment-specific — no PME equivalent | _(none)_ |
