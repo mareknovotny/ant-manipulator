@@ -36,7 +36,7 @@ The stages mirror PME's `ManipulationManager` flow:
 The build is a multi-module Maven reactor, mirroring PME's structure:
 
 | Module | Contents |
-|---|---|
+| --- | --- |
 | `common` | Shared value types, the PME-style `VersionIncrementer` (version math), and the Dependency Analyzer REST translator. Request/response model types come from [`da:reports-model`](https://github.com/project-ncl/dependency-analysis) so the wire format stays consistent with PME and GME. |
 | `core` | The Ant-tree manipulators — GAV resolution/correlation, version reconciliation, the formatting-preserving rewriter — plus the alignment report. |
 | `cli` | The picocli entry point; builds the self-contained (shaded) executable jar. |
@@ -83,7 +83,7 @@ java -jar cli/target/ant-manipulation-cli.jar -f /path/to/build.xml \
 ### Flags
 
 | Flag | Description |
-|---|---|
+| --- | --- |
 | `-f, --file` | Ant build file to operate against (default `./build.xml`) |
 | `--preview` | Only show the edits that would be made; do not modify any files. Without it, computed versions are written in place (no backups — assumes version control), matching PME/GME. |
 | `-d, --debug` | Enable debug logging |
@@ -93,7 +93,7 @@ java -jar cli/target/ant-manipulation-cli.jar -f /path/to/build.xml \
 REST/DA and version keys match PME/GME verbatim; `restURL` enables alignment when set.
 
 | Property | Description | Default |
-|---|---|---|
+| --- | --- | --- |
 | `restURL` | DA lookup service base URL; when set, coordinates are aligned | — |
 | `restMode` | DA lookup mode (`PERSISTENT`, `TEMPORARY`, …) | `PERSISTENT` |
 | `restHeaders` | Request headers as comma-separated `name:value` pairs (auth token goes here) | — |
