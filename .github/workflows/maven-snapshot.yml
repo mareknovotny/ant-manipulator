@@ -11,7 +11,7 @@ jobs:
     uses: project-ncl/shared-github-actions/.github/workflows/maven-snapshot.yml@646d9b629925d6405fb06ed1476aefd6b2cdca86 # v0.0.23
     with:
       project_name: "project-ncl/ant-manipulator"
-      java_version: 11
+      java_version: 17
     secrets:
       SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
       SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}

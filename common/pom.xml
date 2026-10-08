@@ -17,6 +17,12 @@
 
   <dependencies>
     <dependency>
+      <!-- DA request/response model types (MavenLookupRequest, MavenLatestRequest, GAV, etc.).
+           Replaces the hand-rolled local copies; keeps the wire format consistent with PME and GME. -->
+      <groupId>org.jboss.da</groupId>
+      <artifactId>reports-model</artifactId>
+    </dependency>
+    <dependency>
       <!-- HTTP client for the DA-style version lookup, matching pom-manipulation-ext. -->
       <groupId>com.konghq</groupId>
       <artifactId>unirest-java</artifactId>

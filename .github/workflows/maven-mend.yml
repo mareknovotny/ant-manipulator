@@ -19,7 +19,7 @@ jobs:
     uses: project-ncl/shared-github-actions/.github/workflows/maven-ci.yml@646d9b629925d6405fb06ed1476aefd6b2cdca86 # v0.0.23
     with:
       upload_artifacts: true
-      java_version: 11
+      java_version: 17
 
   call-maven-mend-ci:
     needs: build

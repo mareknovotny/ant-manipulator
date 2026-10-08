@@ -22,4 +22,4 @@ jobs:
       with:
         new_version: ${{ inputs.new_version }}
         ref_for_version: ${{ inputs.ref_for_version }}
-        java_version: 11
+        java_version: 17

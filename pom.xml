@@ -46,11 +46,12 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <!-- Match pom-manipulation-ext: compile/target Java 8, built with JDK 11+. -->
+    <!-- Match pom-manipulation-ext: compile/target Java 8, built with JDK 17+ (required by spotless 2.44.x). -->
     <javaVersion>1.8</javaVersion>
     <maven.compiler.source>${javaVersion}</maven.compiler.source>
     <maven.compiler.target>${javaVersion}</maven.compiler.target>
     <maven.compiler.release>8</maven.compiler.release>
+    <da.reports-model.version>2.6.8</da.reports-model.version>
     <picocli.version>4.7.6</picocli.version>
     <slf4j.version>2.0.13</slf4j.version>
     <ant.version>1.10.18</ant.version>
@@ -93,6 +94,11 @@
       </dependency>
 
       <!-- Third-party. -->
+      <dependency>
+        <groupId>org.jboss.da</groupId>
+        <artifactId>reports-model</artifactId>
+        <version>${da.reports-model.version}</version>
+      </dependency>
       <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
@@ -160,21 +166,6 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
-
-  <pluginRepositories>
-    <pluginRepository>
-      <!-- Hosts org.jboss.pnc:ide-config, the shared Spotless config used by pom-manipulation-ext. -->
-      <id>jboss-public</id>
-      <name>JBoss Public Repository Group</name>
-      <url>https://repository.jboss.org/nexus/content/groups/public/</url>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </pluginRepository>
-  </pluginRepositories>
 
   <build>
     <pluginManagement>
