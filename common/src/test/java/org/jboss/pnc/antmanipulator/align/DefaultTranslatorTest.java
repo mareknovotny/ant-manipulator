@@ -4,7 +4,6 @@ import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
-import static com.github.tomakehurst.wiremock.client.WireMock.notMatching;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
@@ -15,6 +14,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import org.jboss.da.model.rest.GAV;
 import org.jboss.pnc.antmanipulator.align.DefaultTranslator.TranslatorException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,9 +36,9 @@ class DefaultTranslatorTest {
     private WireMockServer server;
     private String baseUrl;
 
-    private static final Gav A = new Gav("org.acme", "widget", "1.0");
-    private static final Gav B = new Gav("org.acme", "gadget", "2.0");
-    private static final Gav C = new Gav("org.acme", "sprocket", "3.0");
+    private static final GAV A = new GAV("org.acme", "widget", "1.0");
+    private static final GAV B = new GAV("org.acme", "gadget", "2.0");
+    private static final GAV C = new GAV("org.acme", "sprocket", "3.0");
 
     @BeforeEach
     void startServer() {
@@ -73,7 +73,7 @@ class DefaultTranslatorTest {
                 "[{\"groupId\":\"org.acme\",\"artifactId\":\"widget\",\"version\":\"1.0\","
                         + "\"bestMatchVersion\":\"1.0.redhat-00001\"}]");
 
-        Map<Gav, String> result = translator().lookupVersions(Arrays.asList(A));
+        Map<GAV, String> result = translator().lookupVersions(Arrays.asList(A));
 
         assertThat(result).containsExactly(org.assertj.core.api.Assertions.entry(A, "1.0.redhat-00001"));
         // The coordinate set must be sent under "artifacts" (any other name yields a server-side 500).
@@ -91,7 +91,7 @@ class DefaultTranslatorTest {
                 "[{\"groupId\":\"org.acme\",\"artifactId\":\"widget\",\"version\":\"1.0\","
                         + "\"latestVersion\":\"1.0.redhat-00005\"}]");
 
-        Map<Gav, String> result = translator().lookupProjectVersions(Arrays.asList(A));
+        Map<GAV, String> result = translator().lookupProjectVersions(Arrays.asList(A));
 
         assertThat(result).containsExactly(org.assertj.core.api.Assertions.entry(A, "1.0.redhat-00005"));
     }
@@ -106,7 +106,7 @@ class DefaultTranslatorTest {
                         + "\"bestMatchVersion\":\"  \"},"
                         + "{\"groupId\":\"org.acme\",\"artifactId\":\"sprocket\",\"version\":\"3.0\"}]");
 
-        Map<Gav, String> result = translator().lookupVersions(Arrays.asList(A, B, C));
+        Map<GAV, String> result = translator().lookupVersions(Arrays.asList(A, B, C));
 
         // Only the coordinate with a non-blank bestMatchVersion survives.
         assertThat(result).containsOnlyKeys(A);
@@ -122,28 +122,30 @@ class DefaultTranslatorTest {
     }
 
     @Test
-    void modeAndBrewPullAreOmittedWhenNull() {
+    void defaultModeIsSentWhenNotConfigured() {
         stubJson("/lookup/maven", "[]");
 
         translator().lookupVersions(Arrays.asList(A));
 
+        // When no mode is configured, the translator falls back to DEFAULT_MODE so the DA contract
+        // (mode is @NonNull) is satisfied. brewPullActive defaults to false.
         server.verify(
                 postRequestedFor(urlEqualTo("/lookup/maven"))
-                        .withRequestBody(notMatching("(?s).*\"mode\".*"))
-                        .withRequestBody(notMatching("(?s).*\"brewPullActive\".*")));
+                        .withRequestBody(matchingJsonPath("$.mode", equalTo(DefaultTranslator.DEFAULT_MODE)))
+                        .withRequestBody(matchingJsonPath("$.brewPullActive", equalTo("false"))));
     }
 
     @Test
     void modeAndBrewPullAreSentWhenConfigured() {
         stubJson("/lookup/maven", "[]");
 
-        new DefaultTranslator(baseUrl, null, "PERSISTENT", Boolean.FALSE, 128)
+        new DefaultTranslator(baseUrl, null, "PERSISTENT", Boolean.TRUE, 128)
                 .lookupVersions(Arrays.asList(A));
 
         server.verify(
                 postRequestedFor(urlEqualTo("/lookup/maven"))
                         .withRequestBody(matchingJsonPath("$.mode", equalTo("PERSISTENT")))
-                        .withRequestBody(matchingJsonPath("$.brewPullActive", equalTo("false"))));
+                        .withRequestBody(matchingJsonPath("$.brewPullActive", equalTo("true"))));
     }
 
     @Test
@@ -174,7 +176,7 @@ class DefaultTranslatorTest {
                         .willReturn(aResponse().withStatus(500).withStatusMessage("Server Error")));
 
         DefaultTranslator t = translator();
-        List<Gav> gavs = Arrays.asList(A);
+        List<GAV> gavs = Arrays.asList(A);
         assertThatThrownBy(() -> t.lookupVersions(gavs))
                 .isInstanceOf(TranslatorException.class)
                 .hasMessageContaining("500");

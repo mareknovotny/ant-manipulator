@@ -9,8 +9,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
+import org.jboss.da.model.rest.GAV;
 import org.jboss.pnc.antmanipulator.align.DefaultTranslator;
-import org.jboss.pnc.antmanipulator.align.Gav;
 import org.jboss.pnc.antmanipulator.align.Translator;
 import org.jboss.pnc.antmanipulator.align.VersionIncrementer;
 import org.jboss.pnc.antmanipulator.gav.CorrelatedGav;
@@ -238,7 +238,7 @@ public class Cli implements Callable<Integer> {
             // exactly as PME delegates to the Dependency Analyzer.
             String restUrl = properties.getProperty(PROP_REST_URL);
             if (restUrl != null && !restUrl.trim().isEmpty()) {
-                List<Gav> coordinates = concreteCoordinates(gavs, reconciler);
+                List<GAV> coordinates = concreteCoordinates(gavs, reconciler);
                 if (coordinates.isEmpty()) {
                     logger.warn("No concrete coordinates to align; skipping lookup.");
                 } else {
@@ -250,7 +250,7 @@ public class Cli implements Callable<Integer> {
                             boolProp(PROP_REST_BREW_PULL),
                             128,
                             intProp(PROP_REST_SOCKET_TIMEOUT));
-                    Map<Gav, String> latest = translator.lookupProjectVersions(coordinates);
+                    Map<GAV, String> latest = translator.lookupProjectVersions(coordinates);
                     VersionIncrementer incrementer = new VersionIncrementer(
                             properties.getProperty(PROP_VERSION_INCREMENTAL_SUFFIX, VersionIncrementer.DEFAULT_SUFFIX),
                             intProp(PROP_VERSION_INCREMENTAL_SUFFIX_PADDING, VersionIncrementer.DEFAULT_PADDING),
@@ -260,7 +260,7 @@ public class Cli implements Callable<Integer> {
                     // Collect base version literal -> computed publish version, for the rewrite step.
                     Map<String, String> versionRewrites = new LinkedHashMap<>();
                     logger.info("Computed publish version(s) for {} coordinate(s):", coordinates.size());
-                    for (Gav g : coordinates) {
+                    for (GAV g : coordinates) {
                         String daLatest = latest.get(g); // null when DA has no prior build
                         VersionIncrementer.Result r = incrementer.nextVersion(g.getVersion(), daLatest);
                         logger.info("    {} -> {}", g, r.summarize());
@@ -301,8 +301,8 @@ public class Cli implements Callable<Integer> {
      * dropping the coordinate. (Picking a single winner is the rewrite step's job, not the lookup's.)
      * Unresolved versions are skipped. Deduplicated, order preserved.
      */
-    private static List<Gav> concreteCoordinates(List<ResolvedGav> gavs, VersionReconciler reconciler) {
-        Set<Gav> out = new LinkedHashSet<>();
+    private static List<GAV> concreteCoordinates(List<ResolvedGav> gavs, VersionReconciler reconciler) {
+        Set<GAV> out = new LinkedHashSet<>();
         for (ResolvedGav g : gavs) {
             String groupId = g.getGroupId();
             String artifactId = g.getArtifactId();
@@ -312,14 +312,14 @@ public class Cli implements Callable<Integer> {
 
             String version = g.getVersion();
             if (version != null && !g.hasUnresolvedVersion()) {
-                out.add(new Gav(groupId, artifactId, version));
+                out.add(new GAV(groupId, artifactId, version));
                 continue;
             }
 
             if (version != null) {
                 VersionReconciler.Resolution r = reconciler.reconcile(version);
                 for (String resolved : r.getResolved()) {
-                    out.add(new Gav(groupId, artifactId, resolved));
+                    out.add(new GAV(groupId, artifactId, resolved));
                 }
             }
         }
