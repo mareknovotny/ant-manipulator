@@ -66,7 +66,7 @@
     <!-- Spotless + the shared PNC IDE config, exactly as pom-manipulation-ext uses. The Eclipse
          JDT formatter is JDK-independent (unlike google/palantir-java-format, which break on newer
          JDKs), so it runs under any build JVM. -->
-    <spotless.version>3.4.0</spotless.version>
+    <spotless.version>2.44.4</spotless.version>
     <ide-config.version>1.1.0</ide-config.version>
     <shade.version>3.6.0</shade.version>
     <failsafe.version>3.2.5</failsafe.version>
