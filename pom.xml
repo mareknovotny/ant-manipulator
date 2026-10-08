@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.jboss.pnc.ant-manipulator</groupId>
+  <artifactId>ant-manipulator-parent</artifactId>
+  <version>0.1-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>Ant Manipulator Parent</name>
+  <description>A CLI to align versions and coordinates in Apache Ant projects, modelled on the Maven
+    POM Manipulation Extension (PME) and the Gradle Manipulator (GME). It supports rebuilding
+    pre-existing projects in a cleanroom environment: discover published coordinates, align them
+    against a Dependency Analyzer service, and rewrite the build files in place. This is the parent
+    aggregator; the modules (common, core, cli, integration-test) mirror PME's layout.</description>
+  <url>https://github.com/project-ncl/ant-manipulator</url>
+
+  <licenses>
+    <license>
+      <name>The Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <scm>
+    <connection>scm:git:https://github.com/project-ncl/ant-manipulator.git</connection>
+    <developerConnection>scm:git:git@github.com:project-ncl/ant-manipulator.git</developerConnection>
+    <url>https://github.com/project-ncl/ant-manipulator</url>
+    <tag>HEAD</tag>
+  </scm>
+
+  <!-- Module layout mirrors pom-manipulation-ext:
+         common          - shared value types, version math (VersionIncrementer), DA translator
+         core            - the Ant-tree manipulators (resolve/correlate/reconcile/rewrite) + report
+         cli             - the picocli entry point; builds the shaded executable jar
+         integration-test - end-to-end tests that drive the built CLI against fixture projects -->
+  <modules>
+    <module>common</module>
+    <module>core</module>
+    <module>cli</module>
+    <module>integration-test</module>
+  </modules>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- Match pom-manipulation-ext: compile/target Java 8, built with JDK 11+. -->
+    <javaVersion>1.8</javaVersion>
+    <maven.compiler.source>${javaVersion}</maven.compiler.source>
+    <maven.compiler.target>${javaVersion}</maven.compiler.target>
+    <maven.compiler.release>8</maven.compiler.release>
+    <picocli.version>4.7.6</picocli.version>
+    <slf4j.version>2.0.13</slf4j.version>
+    <ant.version>1.10.18</ant.version>
+    <!-- Unirest 3.x is the Java 8-baseline line PME pins. -->
+    <unirest.version>3.14.5</unirest.version>
+    <!-- Test stack, matching pom-manipulation-ext / gradle-manipulator. -->
+    <junit.version>5.10.2</junit.version>
+    <assertj.version>3.25.3</assertj.version>
+    <!-- WireMock stubs the DA lookup service in tests. The jre8-standalone (shaded) artifact keeps its
+         Jetty/Jackson/HttpClient off our classpath so it can't clash with Unirest's, and its Java 8
+         bytecode matches our compile target. Same line gradle-manipulator uses (2.35.x). -->
+    <wiremock.version>2.35.2</wiremock.version>
+    <!-- Spotless + the shared PNC IDE config, exactly as pom-manipulation-ext uses. The Eclipse
+         JDT formatter is JDK-independent (unlike google/palantir-java-format, which break on newer
+         JDKs), so it runs under any build JVM. -->
+    <spotless.version>3.4.0</spotless.version>
+    <ide-config.version>1.1.0</ide-config.version>
+    <shade.version>3.6.0</shade.version>
+    <failsafe.version>3.2.5</failsafe.version>
+    <mainClass>org.jboss.pnc.antmanipulator.cli.Cli</mainClass>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- Internal modules. -->
+      <dependency>
+        <groupId>org.jboss.pnc.ant-manipulator</groupId>
+        <artifactId>ant-manipulation-common</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jboss.pnc.ant-manipulator</groupId>
+        <artifactId>ant-manipulation-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jboss.pnc.ant-manipulator</groupId>
+        <artifactId>ant-manipulation-cli</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
+      <!-- Third-party. -->
+      <dependency>
+        <groupId>info.picocli</groupId>
+        <artifactId>picocli</artifactId>
+        <version>${picocli.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ant</groupId>
+        <artifactId>ant</artifactId>
+        <version>${ant.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.konghq</groupId>
+        <artifactId>unirest-java</artifactId>
+        <version>${unirest.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.konghq</groupId>
+        <artifactId>unirest-objectmapper-jackson</artifactId>
+        <version>${unirest.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-simple</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+
+      <!-- Test. -->
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>${junit.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <version>${assertj.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.github.tomakehurst</groupId>
+        <artifactId>wiremock-jre8-standalone</artifactId>
+        <version>${wiremock.version}</version>
+        <scope>test</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!-- Every module tests with JUnit 5 + AssertJ. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <pluginRepositories>
+    <pluginRepository>
+      <!-- Hosts org.jboss.pnc:ide-config, the shared Spotless config used by pom-manipulation-ext. -->
+      <id>jboss-public</id>
+      <name>JBoss Public Repository Group</name>
+      <url>https://repository.jboss.org/nexus/content/groups/public/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </pluginRepository>
+  </pluginRepositories>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <!-- Enforces a consistent code format (see CONTRIBUTING.md). Mirrors pom-manipulation-ext:
+               the Eclipse JDT formatter (JDK-independent) driven by the shared PNC ide-config, bound
+               to `apply` at the compile phase so `mvn package` reformats as part of the build.
+               Run `mvn spotless:check` to verify without changing files. -->
+          <groupId>com.diffplug.spotless</groupId>
+          <artifactId>spotless-maven-plugin</artifactId>
+          <version>${spotless.version}</version>
+          <configuration>
+            <java>
+              <removeUnusedImports/>
+              <importOrder>
+                <file>java-import-order.txt</file>
+              </importOrder>
+              <eclipse>
+                <file>java-formatter.xml</file>
+              </eclipse>
+              <lineEndings>UNIX</lineEndings>
+            </java>
+          </configuration>
+          <dependencies>
+            <dependency>
+              <groupId>org.jboss.pnc</groupId>
+              <artifactId>ide-config</artifactId>
+              <version>${ide-config.version}</version>
+            </dependency>
+          </dependencies>
+          <executions>
+            <execution>
+              <id>spotless-apply</id>
+              <phase>compile</phase>
+              <goals>
+                <goal>apply</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-shade-plugin</artifactId>
+          <version>${shade.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <version>${failsafe.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
+    <plugins>
+      <!-- Applied to every module so the whole reactor is formatted consistently. -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.jboss.pnc.ant-manipulator</groupId>
+    <artifactId>ant-manipulator-parent</artifactId>
+    <version>0.1-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>ant-manipulation-common</artifactId>
+  <name>Ant Manipulation Common Components</name>
+  <description>Shared value types, the PME-style VersionIncrementer (version math), and the Dependency
+    Analyzer REST translator. Depends on no other module.</description>
+
+  <dependencies>
+    <dependency>
+      <!-- HTTP client for the DA-style version lookup, matching pom-manipulation-ext. -->
+      <groupId>com.konghq</groupId>
+      <artifactId>unirest-java</artifactId>
+    </dependency>
+    <dependency>
+      <!-- Jackson object mapper Unirest uses to bind request/response JSON, as PME does. -->
+      <groupId>com.konghq</groupId>
+      <artifactId>unirest-objectmapper-jackson</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <!-- Stubs the DA lookup endpoints so DefaultTranslator can be exercised without a live service. -->
+      <groupId>com.github.tomakehurst</groupId>
+      <artifactId>wiremock-jre8-standalone</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

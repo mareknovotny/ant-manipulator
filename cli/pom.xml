@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.jboss.pnc.ant-manipulator</groupId>
+    <artifactId>ant-manipulator-parent</artifactId>
+    <version>0.1-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>ant-manipulation-cli</artifactId>
+  <name>Ant Manipulation CLI</name>
+  <description>The picocli command-line entry point that wires the pipeline together and builds the
+    self-contained (shaded) executable jar.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.jboss.pnc.ant-manipulator</groupId>
+      <artifactId>ant-manipulation-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.jboss.pnc.ant-manipulator</groupId>
+      <artifactId>ant-manipulation-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>info.picocli</groupId>
+      <artifactId>picocli</artifactId>
+    </dependency>
+    <dependency>
+      <!-- BuildFilePeek reuses Ant's ProjectHelper to read the raw build file. -->
+      <groupId>org.apache.ant</groupId>
+      <artifactId>ant</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>ant-manipulation-cli</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>${mainClass}</mainClass>
+                </transformer>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

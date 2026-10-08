@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.jboss.pnc.ant-manipulator</groupId>
+    <artifactId>ant-manipulator-parent</artifactId>
+    <version>0.1-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>ant-manipulation-integration-test</artifactId>
+  <name>Ant Manipulation Integration Tests</name>
+  <description>End-to-end tests that drive the assembled pipeline against fixture Ant projects under
+    src/test/resources, mirroring pom-manipulation-ext's integration-test module.</description>
+
+  <properties>
+    <!-- Nothing to publish from the IT module. -->
+    <maven.deploy.skip>true</maven.deploy.skip>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.jboss.pnc.ant-manipulator</groupId>
+      <artifactId>ant-manipulation-cli</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jboss.pnc.ant-manipulator</groupId>
+      <artifactId>ant-manipulation-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jboss.pnc.ant-manipulator</groupId>
+      <artifactId>ant-manipulation-common</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <!-- Integration tests run in the integration-test phase via failsafe. -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
