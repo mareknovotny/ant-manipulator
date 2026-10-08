@@ -44,7 +44,7 @@ The build is a multi-module Maven reactor, mirroring PME's structure:
 
 ## Requirements
 
-- Java 11+ to build (compile target is Java 8, matching PME)
+- Java 17+ to build (compile target is Java 8, matching PME)
 - Maven 3.8+
 
 ## Building
