@@ -179,6 +179,11 @@
           <artifactId>spotless-maven-plugin</artifactId>
           <version>${spotless.version}</version>
           <configuration>
+            <pom>
+              <sortPom>
+                <expandEmptyElements>false</expandEmptyElements>
+              </sortPom>
+           </pom>
             <java>
               <removeUnusedImports/>
               <importOrder>
