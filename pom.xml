@@ -49,12 +49,9 @@
     <maven.compiler.source>${javaVersion}</maven.compiler.source>
     <maven.compiler.target>${javaVersion}</maven.compiler.target>
     <maven.compiler.release>8</maven.compiler.release>
-    <da.reports-model.version>2.6.8</da.reports-model.version>
     <picocli.version>4.7.6</picocli.version>
     <slf4j.version>2.0.13</slf4j.version>
     <ant.version>1.10.18</ant.version>
-    <!-- Unirest 3.x is the Java 8-baseline line PME pins. -->
-    <unirest.version>3.14.5</unirest.version>
     <!-- Test stack, matching pom-manipulation-ext / gradle-manipulator. -->
     <junit.version>5.10.2</junit.version>
     <assertj.version>3.25.3</assertj.version>
@@ -93,11 +90,6 @@
 
       <!-- Third-party. -->
       <dependency>
-        <groupId>org.jboss.da</groupId>
-        <artifactId>reports-model</artifactId>
-        <version>${da.reports-model.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.jboss.pnc.maven-manipulator</groupId>
         <artifactId>pom-manipulation-io</artifactId>
         <version>5.9</version>
@@ -111,16 +103,6 @@
         <groupId>org.apache.ant</groupId>
         <artifactId>ant</artifactId>
         <version>${ant.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.konghq</groupId>
-        <artifactId>unirest-java</artifactId>
-        <version>${unirest.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.konghq</groupId>
-        <artifactId>unirest-objectmapper-jackson</artifactId>
-        <version>${unirest.version}</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
