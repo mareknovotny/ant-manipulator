@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
@@ -17,27 +15,18 @@
 
   <dependencies>
     <dependency>
-      <!-- DA request/response model types (MavenLookupRequest, MavenLatestRequest, GAV, etc.).
-           Replaces the hand-rolled local copies; keeps the wire format consistent with PME and GME. -->
-      <groupId>org.jboss.da</groupId>
-      <artifactId>reports-model</artifactId>
-    </dependency>
-    <dependency>
-      <!-- HTTP client for the DA-style version lookup, matching pom-manipulation-ext. -->
-      <groupId>com.konghq</groupId>
-      <artifactId>unirest-java</artifactId>
-    </dependency>
-    <dependency>
-      <!-- Jackson object mapper Unirest uses to bind request/response JSON, as PME does. -->
-      <groupId>com.konghq</groupId>
-      <artifactId>unirest-objectmapper-jackson</artifactId>
+      <!-- PME's io module: supplies DefaultTranslator, Translator, RestException, and all their
+           supporting types (DependencyAnalyserResult, GAVUtils, PMEObjectMapper, …).
+           Re-using it directly means bug-fixes and improvements in PME propagate for free. -->
+      <groupId>org.jboss.pnc.maven-manipulator</groupId>
+      <artifactId>pom-manipulation-io</artifactId>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
-      <!-- Stubs the DA lookup endpoints so DefaultTranslator can be exercised without a live service. -->
+      <!-- Stubs the DA lookup endpoints so the translator can be exercised without a live service. -->
       <groupId>com.github.tomakehurst</groupId>
       <artifactId>wiremock-jre8-standalone</artifactId>
       <scope>test</scope>

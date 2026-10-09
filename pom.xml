@@ -100,6 +100,11 @@
         <version>${da.reports-model.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.jboss.pnc.maven-manipulator</groupId>
+        <artifactId>pom-manipulation-io</artifactId>
+        <version>5.9</version>
+      </dependency>
+      <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
         <version>${picocli.version}</version>

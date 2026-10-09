@@ -1,6 +1,7 @@
 package org.jboss.pnc.antmanipulator.cli;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -9,9 +10,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
-import org.jboss.da.model.rest.GAV;
-import org.jboss.pnc.antmanipulator.align.DefaultTranslator;
-import org.jboss.pnc.antmanipulator.align.Translator;
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
+import org.commonjava.atlas.maven.ident.ref.SimpleProjectVersionRef;
 import org.jboss.pnc.antmanipulator.align.VersionIncrementer;
 import org.jboss.pnc.antmanipulator.gav.CorrelatedGav;
 import org.jboss.pnc.antmanipulator.gav.GavCorrelator;
@@ -20,6 +20,9 @@ import org.jboss.pnc.antmanipulator.gav.ResolvedGav;
 import org.jboss.pnc.antmanipulator.gav.VersionReconciler;
 import org.jboss.pnc.antmanipulator.gav.VersionRewriter;
 import org.jboss.pnc.antmanipulator.report.AlignmentReport;
+import org.jboss.pnc.mavenmanipulator.io.rest.DefaultTranslator;
+import org.jboss.pnc.mavenmanipulator.io.rest.RestException;
+import org.jboss.pnc.mavenmanipulator.io.rest.Translator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,8 +53,12 @@ public class Cli implements Callable<Integer> {
     static final String PROP_REST_URL = "restURL";
     static final String PROP_REST_MODE = "restMode";
     static final String PROP_REST_BREW_PULL = "restBrewPullActive";
+    static final String PROP_REST_CONNECTION_TIMEOUT = "restConnectionTimeout";
     static final String PROP_REST_SOCKET_TIMEOUT = "restSocketTimeout";
+    static final String PROP_REST_MAX_SIZE = "restMaxSize";
+    static final String PROP_REST_MIN_SIZE = "restMinSize";
     static final String PROP_REST_HEADERS = "restHeaders";
+    static final String PROP_REST_RETRY_DURATION = "restRetryDuration";
     static final String PROP_VERSION_INCREMENTAL_SUFFIX = "versionIncrementalSuffix";
     static final String PROP_VERSION_INCREMENTAL_SUFFIX_PADDING = "versionIncrementalSuffixPadding";
     static final String PROP_REPORT_JSON = "reportJSONOutputFile";
@@ -238,19 +245,28 @@ public class Cli implements Callable<Integer> {
             // exactly as PME delegates to the Dependency Analyzer.
             String restUrl = properties.getProperty(PROP_REST_URL);
             if (restUrl != null && !restUrl.trim().isEmpty()) {
-                List<GAV> coordinates = concreteCoordinates(gavs, reconciler);
+                List<ProjectVersionRef> coordinates = concreteCoordinates(gavs, reconciler);
                 if (coordinates.isEmpty()) {
                     logger.warn("No concrete coordinates to align; skipping lookup.");
                 } else {
                     logger.info("Aligning {} project coordinate(s) against {}", coordinates.size(), restUrl);
                     Translator translator = new DefaultTranslator(
                             restUrl,
-                            parseRestHeaders(properties.getProperty(PROP_REST_HEADERS)),
-                            properties.getProperty(PROP_REST_MODE),
+                            intProp(PROP_REST_MAX_SIZE, -1),
+                            intProp(PROP_REST_MIN_SIZE, 1),
                             boolProp(PROP_REST_BREW_PULL),
-                            128,
-                            intProp(PROP_REST_SOCKET_TIMEOUT));
-                    Map<GAV, String> latest = translator.lookupProjectVersions(coordinates);
+                            stringProp(PROP_REST_MODE, "PERSISTENT"),
+                            parseRestHeaders(properties.getProperty(PROP_REST_HEADERS)),
+                            intProp(PROP_REST_CONNECTION_TIMEOUT, Translator.DEFAULT_CONNECTION_TIMEOUT_SEC),
+                            intProp(PROP_REST_SOCKET_TIMEOUT, Translator.DEFAULT_SOCKET_TIMEOUT_SEC),
+                            intProp(PROP_REST_RETRY_DURATION, Translator.RETRY_DURATION_SEC));
+                    Map<ProjectVersionRef, String> latest;
+                    try {
+                        latest = translator.lookupProjectVersions(coordinates);
+                    } catch (RestException e) {
+                        logger.error("DA lookup failed: {}", e.getMessage(), e);
+                        return 10;
+                    }
                     VersionIncrementer incrementer = new VersionIncrementer(
                             properties.getProperty(PROP_VERSION_INCREMENTAL_SUFFIX, VersionIncrementer.DEFAULT_SUFFIX),
                             intProp(PROP_VERSION_INCREMENTAL_SUFFIX_PADDING, VersionIncrementer.DEFAULT_PADDING),
@@ -260,12 +276,17 @@ public class Cli implements Callable<Integer> {
                     // Collect base version literal -> computed publish version, for the rewrite step.
                     Map<String, String> versionRewrites = new LinkedHashMap<>();
                     logger.info("Computed publish version(s) for {} coordinate(s):", coordinates.size());
-                    for (GAV g : coordinates) {
+                    for (ProjectVersionRef g : coordinates) {
                         String daLatest = latest.get(g); // null when DA has no prior build
-                        VersionIncrementer.Result r = incrementer.nextVersion(g.getVersion(), daLatest);
-                        logger.info("    {} -> {}", g, r.summarize());
+                        VersionIncrementer.Result r = incrementer.nextVersion(g.getVersionString(), daLatest);
+                        logger.info(
+                                "    {}:{}:{} -> {}",
+                                g.getGroupId(),
+                                g.getArtifactId(),
+                                g.getVersionString(),
+                                r.summarize());
 
-                        String base = g.getVersion();
+                        String base = g.getVersionString();
                         String prior = versionRewrites.putIfAbsent(base, r.getNewVersion());
                         if (prior != null && !prior.equals(r.getNewVersion())) {
                             // Same literal defines two coordinates that align differently; we can't rewrite
@@ -301,8 +322,10 @@ public class Cli implements Callable<Integer> {
      * dropping the coordinate. (Picking a single winner is the rewrite step's job, not the lookup's.)
      * Unresolved versions are skipped. Deduplicated, order preserved.
      */
-    private static List<GAV> concreteCoordinates(List<ResolvedGav> gavs, VersionReconciler reconciler) {
-        Set<GAV> out = new LinkedHashSet<>();
+    private static List<ProjectVersionRef> concreteCoordinates(
+            List<ResolvedGav> gavs,
+            VersionReconciler reconciler) {
+        Set<ProjectVersionRef> out = new LinkedHashSet<>();
         for (ResolvedGav g : gavs) {
             String groupId = g.getGroupId();
             String artifactId = g.getArtifactId();
@@ -312,18 +335,33 @@ public class Cli implements Callable<Integer> {
 
             String version = g.getVersion();
             if (version != null && !g.hasUnresolvedVersion()) {
-                out.add(new GAV(groupId, artifactId, version));
+                out.add(toRef(groupId, artifactId, version));
                 continue;
             }
 
             if (version != null) {
                 VersionReconciler.Resolution r = reconciler.reconcile(version);
                 for (String resolved : r.getResolved()) {
-                    out.add(new GAV(groupId, artifactId, resolved));
+                    out.add(toRef(groupId, artifactId, resolved));
                 }
             }
         }
-        return new java.util.ArrayList<>(out);
+        return new ArrayList<>(out);
+    }
+
+    /**
+     * Convert plain string coordinates to a {@link ProjectVersionRef}. Atlas may throw
+     * {@link org.commonjava.atlas.maven.ident.version.InvalidVersionSpecificationException} for
+     * non-standard version strings; we treat those as unresolvable and skip them.
+     */
+    private static ProjectVersionRef toRef(String groupId, String artifactId, String version) {
+        try {
+            return new SimpleProjectVersionRef(groupId, artifactId, version);
+        } catch (Exception e) {
+            throw new IllegalArgumentException(
+                    "Cannot create ProjectVersionRef for " + groupId + ":" + artifactId + ":" + version,
+                    e);
+        }
     }
 
     /**
@@ -406,5 +444,11 @@ public class Cli implements Callable<Integer> {
     private int intProp(String key, int fallback) {
         Integer v = intProp(key);
         return v == null ? fallback : v;
+    }
+
+    /** The property as a String, or {@code fallback} when unset/blank. */
+    private String stringProp(String key, String fallback) {
+        String v = properties.getProperty(key);
+        return (v == null || v.trim().isEmpty()) ? fallback : v.trim();
     }
 }
