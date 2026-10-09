@@ -125,7 +125,8 @@ public class Cli implements Callable<Integer> {
     @Override
     public Integer call() {
         if (debug) {
-            System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "debug");
+            ((ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME))
+                    .setLevel(ch.qos.logback.classic.Level.DEBUG);
         }
 
         final File buildFile = target.getAbsoluteFile();

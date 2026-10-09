@@ -2,6 +2,12 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
+  <parent>
+    <groupId>org.jboss</groupId>
+    <artifactId>jboss-parent</artifactId>
+    <version>54</version>
+  </parent>
+
   <groupId>org.jboss.pnc.ant-manipulator</groupId>
   <artifactId>ant-manipulator-parent</artifactId>
   <version>0.1-SNAPSHOT</version>
@@ -49,12 +55,16 @@
     <maven.compiler.source>${javaVersion}</maven.compiler.source>
     <maven.compiler.target>${javaVersion}</maven.compiler.target>
     <maven.compiler.release>8</maven.compiler.release>
+
+    <!-- Override enforcer requirements -->
+    <jdk.min.version>17</jdk.min.version>
+
     <picocli.version>4.7.6</picocli.version>
-    <slf4j.version>2.0.13</slf4j.version>
     <ant.version>1.10.18</ant.version>
     <!-- Test stack, matching pom-manipulation-ext / gradle-manipulator. -->
     <junit.version>5.10.2</junit.version>
     <assertj.version>3.25.3</assertj.version>
+    <logback.version>1.6.5</logback.version>
     <!-- WireMock stubs the DA lookup service in tests. The jre8-standalone (shaded) artifact keeps its
          Jetty/Jackson/HttpClient off our classpath so it can't clash with Unirest's, and its Java 8
          bytecode matches our compile target. Same line gradle-manipulator uses (2.35.x). -->
@@ -105,14 +115,9 @@
         <version>${ant.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-api</artifactId>
-        <version>${slf4j.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-simple</artifactId>
-        <version>${slf4j.version}</version>
+        <groupId>ch.qos.logback</groupId>
+        <artifactId>logback-classic</artifactId>
+        <version>${logback.version}</version>
       </dependency>
 
       <!-- Test. -->

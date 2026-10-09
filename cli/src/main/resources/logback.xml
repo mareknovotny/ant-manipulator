@@ -1,0 +1,17 @@
+<configuration>
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="STDOUT"/>
+  </root>
+
+  <!-- Suppress noisy DEBUG output from Apache HttpClient (used by Unirest for DA calls) -->
+  <logger name="org.apache" level="WARN"/>
+  <logger name="httpclient.wire" level="WARN"/>
+
+</configuration>
