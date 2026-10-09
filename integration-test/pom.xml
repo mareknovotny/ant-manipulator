@@ -34,6 +34,13 @@
       <artifactId>ant-manipulation-common</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <!-- Stubs the DA lookup endpoint so the align/rewrite round trip can be exercised without a
+           live service, same as common's DefaultTranslatorTest. -->
+      <groupId>com.github.tomakehurst</groupId>
+      <artifactId>wiremock-jre8-standalone</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
