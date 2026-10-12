@@ -305,6 +305,18 @@ public class Cli implements Callable<Integer> {
                                 g.getVersionString(),
                                 r.summarize());
 
+                        if (r.isSkipped()) {
+                            // No usable base version (e.g. a bare "SNAPSHOT"): leave this coordinate's
+                            // version untouched rather than write out a malformed one.
+                            logger.warn(
+                                    "{}:{}:{} has no usable base version to compute a publish version "
+                                            + "from; leaving it unchanged.",
+                                    g.getGroupId(),
+                                    g.getArtifactId(),
+                                    g.getVersionString());
+                            continue;
+                        }
+
                         String base = g.getVersionString();
                         String prior = versionRewrites.putIfAbsent(base, r.getNewVersion());
                         if (prior != null && !prior.equals(r.getNewVersion())) {

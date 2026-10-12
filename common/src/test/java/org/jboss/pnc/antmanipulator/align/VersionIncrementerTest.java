@@ -7,10 +7,11 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link VersionIncrementer}, the PME {@code VersionCalculator} analogue. These lock in
- * the two branches (first build vs increment of an existing DA build), the OSGi-style separator choice,
- * padding preservation/widening, and — critically — the SNAPSHOT handling: a {@code -SNAPSHOT} in the
- * input must NEVER be carried through into the middle of the rebuild version.
+ * Unit tests for {@link VersionIncrementer}. These lock in the two branches (first build, which delegates
+ * to PME's real {@code Version.appendQualifierSuffix()}/{@code getOsgiVersion()}, vs increment of an
+ * existing DA build, which stays our own stem-preserving logic), padding preservation/widening, and —
+ * critically — the SNAPSHOT handling: a {@code -SNAPSHOT} in the input must NEVER be carried through into
+ * the middle of the rebuild version.
  */
 class VersionIncrementerTest {
 
@@ -29,9 +30,32 @@ class VersionIncrementerTest {
         }
 
         @Test
-        void qualifierTailUsesDashSeparator() {
+        void qualifierTailIsZeroFilledWithDotBoundary() {
+            // The 2-component numeric head ("3.8") is OSGi-zero-filled to "3.8.0"; PME's
+            // Version.getOsgiVersion() always rejoins the numeric head to the qualifier with "." (not
+            // whatever delimiter the original version used), so "3.8-beta1" -> "3.8.0.beta1-redhat-00001".
             assertThat(incrementer.nextVersion("3.8-beta1", null).getNewVersion())
-                    .isEqualTo("3.8-beta1-redhat-00001");
+                    .isEqualTo("3.8.0.beta1-redhat-00001");
+        }
+
+        @Test
+        void twoComponentNumericStemIsOsgiZeroFilledToThreeComponents() {
+            // NCL-? / GH #11: JUnit4's "4.9" must publish as 4.9.0.redhat-00001, matching PME's
+            // VersionCalculator (which OSGi-normalizes the stem once a qualifier suffix is appended),
+            // not the invalid-looking 4.9.redhat-00001.
+            assertThat(incrementer.nextVersion("4.9", null).getNewVersion()).isEqualTo("4.9.0.redhat-00001");
+            assertThat(incrementer.nextVersion("1.0", null).getNewVersion()).isEqualTo("1.0.0.redhat-00001");
+        }
+
+        @Test
+        void threeComponentNumericStemIsLeftUnchanged() {
+            assertThat(incrementer.nextVersion("4.13.2", null).getNewVersion())
+                    .isEqualTo("4.13.2.redhat-00001");
+        }
+
+        @Test
+        void singleComponentNumericStemIsOsgiZeroFilledToThreeComponents() {
+            assertThat(incrementer.nextVersion("4", null).getNewVersion()).isEqualTo("4.0.0.redhat-00001");
         }
 
         @Test
@@ -42,10 +66,11 @@ class VersionIncrementerTest {
 
         @Test
         void nullBaseAndNullLatestStillProducesFirstSerial() {
-            // Degenerate input: no base, no DA latest. Should not throw.
+            // Degenerate input: no base, no DA latest. Should not throw. PME's Version.appendQualifierSuffix
+            // prepends "." (not "-") to an empty stem; getOsgiVersion then leaves it unparsed, unchanged.
             Result r = incrementer.nextVersion(null, null);
 
-            assertThat(r.getNewVersion()).isEqualTo("-redhat-00001");
+            assertThat(r.getNewVersion()).isEqualTo(".redhat-00001");
             assertThat(r.isFirstBuild()).isTrue();
         }
 
@@ -112,10 +137,11 @@ class VersionIncrementerTest {
 
         @Test
         void dropsSnapshotFromBaseByDefault() {
-            // The bug we fixed: must be 12.0.0-M1-redhat-00001, NEVER 12.0.0-M1-SNAPSHOT-redhat-00001.
+            // Must never carry SNAPSHOT into the rebuild version. PME's getOsgiVersion() always rejoins
+            // the numeric head to the qualifier with "." (12.0.0.M1), not the original "-" (12.0.0-M1).
             String result = incrementer.nextVersion("12.0.0-M1-SNAPSHOT", null).getNewVersion();
 
-            assertThat(result).isEqualTo("12.0.0-M1-redhat-00001");
+            assertThat(result).isEqualTo("12.0.0.M1-redhat-00001");
             assertThat(result).doesNotContain("SNAPSHOT");
         }
 
@@ -143,7 +169,7 @@ class VersionIncrementerTest {
             VersionIncrementer preserving = new VersionIncrementer("redhat", 5, true);
 
             assertThat(preserving.nextVersion("12.0.0-M1-SNAPSHOT", null).getNewVersion())
-                    .isEqualTo("12.0.0-M1-redhat-00001-SNAPSHOT");
+                    .isEqualTo("12.0.0.M1-redhat-00001-SNAPSHOT");
         }
 
         @Test
@@ -164,6 +190,48 @@ class VersionIncrementerTest {
     }
 
     @Nested
+    class BareSnapshotHandling {
+
+        @Test
+        void bareSnapshotBaseIsSkippedRatherThanSynthesised() {
+            // GH #10: "SNAPSHOT" alone has no real base to build a serial from; don't publish the
+            // meaningless "-redhat-00001" — leave it untouched and flag it as skipped.
+            Result r = incrementer.nextVersion("SNAPSHOT", null);
+
+            assertThat(r.getNewVersion()).isEqualTo("SNAPSHOT");
+            assertThat(r.isSkipped()).isTrue();
+        }
+
+        @Test
+        void bareSnapshotIsCaseInsensitive() {
+            Result r = incrementer.nextVersion("snapshot", null);
+
+            assertThat(r.getNewVersion()).isEqualTo("snapshot");
+            assertThat(r.isSkipped()).isTrue();
+        }
+
+        @Test
+        void bareSnapshotDaLatestIsSkippedRatherThanSynthesised() {
+            // DA itself returning a bare "SNAPSHOT" as latestVersion is just as unusable as a declared one.
+            Result r = incrementer.nextVersion("1.2.3", "SNAPSHOT");
+
+            assertThat(r.getNewVersion()).isEqualTo("1.2.3");
+            assertThat(r.isSkipped()).isTrue();
+            assertThat(r.getBasedOn()).isEqualTo("SNAPSHOT");
+        }
+
+        @Test
+        void normalFirstBuildIsNeverFlaggedAsSkipped() {
+            assertThat(incrementer.nextVersion("4.13.2", null).isSkipped()).isFalse();
+        }
+
+        @Test
+        void normalIncrementIsNeverFlaggedAsSkipped() {
+            assertThat(incrementer.nextVersion("1.0", "1.0-redhat-00003").isSkipped()).isFalse();
+        }
+    }
+
+    @Nested
     class DevMarkerHandling {
 
         /** Opt-in stripper: dev markers are kept by default, so callers must configure them. */
@@ -171,9 +239,10 @@ class VersionIncrementerTest {
 
         @Test
         void keepsDevMarkerByDefault() {
-            // Default keeps -dev; stripping is opt-in via versionSuffixStrip.
+            // Default keeps -dev; stripping is opt-in via versionSuffixStrip. PME's getOsgiVersion()
+            // rejoins the numeric head to the qualifier with "." (10.1.0.dev), not the original "-".
             assertThat(incrementer.nextVersion("10.1.0-dev", null).getNewVersion())
-                    .isEqualTo("10.1.0-dev-redhat-00001");
+                    .isEqualTo("10.1.0.dev-redhat-00001");
         }
 
         @Test
@@ -221,7 +290,7 @@ class VersionIncrementerTest {
             VersionIncrementer noStrip = new VersionIncrementer("redhat", 5, false, "");
 
             assertThat(noStrip.nextVersion("10.1.0-dev", null).getNewVersion())
-                    .isEqualTo("10.1.0-dev-redhat-00001");
+                    .isEqualTo("10.1.0.dev-redhat-00001");
         }
 
         @Test
