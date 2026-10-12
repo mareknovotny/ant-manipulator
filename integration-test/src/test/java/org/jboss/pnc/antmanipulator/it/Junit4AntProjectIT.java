@@ -124,9 +124,9 @@ class Junit4AntProjectIT {
         // ${version-base}${version-status} expression, and the <filter> that stamps it into source.
         String rewrittenBuildFile = readFile(buildFile);
         assertThat(rewrittenBuildFile)
-                .contains("<property name=\"version-base\" value=\"4.8.redhat-00001\" />")
-                .contains("<property name=\"version\" value=\"4.8.redhat-00001\" />")
-                .contains("<filter token=\"version\" value=\"4.8.redhat-00001\" />");
+                .contains("<property name=\"version-base\" value=\"4.8.0.redhat-00001\" />")
+                .contains("<property name=\"version\" value=\"4.8.0.redhat-00001\" />")
+                .contains("<filter token=\"version\" value=\"4.8.0.redhat-00001\" />");
     }
 
     private WireMockServer stubFirstBuildDaServer() {
