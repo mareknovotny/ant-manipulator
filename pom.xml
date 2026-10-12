@@ -105,6 +105,14 @@
         <version>5.9</version>
       </dependency>
       <dependency>
+        <!-- Supplies the Version utility class (OSGi-normalisation, SNAPSHOT/build-number string math)
+             that VersionIncrementer delegates to. Already pulled in transitively by pom-manipulation-io;
+             declared explicitly so it's not an undeclared implementation detail of that dependency. -->
+        <groupId>org.jboss.pnc.maven-manipulator</groupId>
+        <artifactId>pom-manipulation-common-lite</artifactId>
+        <version>5.9</version>
+      </dependency>
+      <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
         <version>${picocli.version}</version>

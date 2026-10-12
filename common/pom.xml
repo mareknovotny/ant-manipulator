@@ -22,6 +22,12 @@
       <artifactId>pom-manipulation-io</artifactId>
     </dependency>
     <dependency>
+      <!-- PME's Version utility class: the OSGi-normalisation and SNAPSHOT/build-number string math
+           that VersionIncrementer's first-build/increment computations delegate to. -->
+      <groupId>org.jboss.pnc.maven-manipulator</groupId>
+      <artifactId>pom-manipulation-common-lite</artifactId>
+    </dependency>
+    <dependency>
       <!-- Stubs the DA lookup endpoints so the translator can be exercised without a live service. -->
       <groupId>com.github.tomakehurst</groupId>
       <artifactId>wiremock-jre8-standalone</artifactId>
