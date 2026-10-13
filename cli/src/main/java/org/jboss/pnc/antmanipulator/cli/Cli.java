@@ -19,6 +19,8 @@ import org.jboss.pnc.antmanipulator.gav.GavResolver;
 import org.jboss.pnc.antmanipulator.gav.ResolvedGav;
 import org.jboss.pnc.antmanipulator.gav.VersionReconciler;
 import org.jboss.pnc.antmanipulator.gav.VersionRewriter;
+import org.jboss.pnc.antmanipulator.groovy.GroovyScriptRunner;
+import org.jboss.pnc.antmanipulator.groovy.InvocationStage;
 import org.jboss.pnc.antmanipulator.report.AlignmentReport;
 import org.jboss.pnc.mavenmanipulator.io.rest.DefaultTranslator;
 import org.jboss.pnc.mavenmanipulator.io.rest.RestException;
@@ -143,6 +145,25 @@ public class Cli implements Callable<Integer> {
 
         logger.info("Operating against Ant build file: {}", buildFile);
 
+        // Groovy scripts (-DgroovyScripts=...), as in PME/GME: FIRST-stage scripts run before anything is read,
+        // so they may edit build files on disk; LAST-stage scripts run after the versions are rewritten.
+        final String restUrl = properties.getProperty(PROP_REST_URL);
+        final Translator translator;
+        try {
+            translator = restUrl == null || restUrl.trim().isEmpty() ? null : createTranslator(restUrl);
+        } catch (RuntimeException e) {
+            logger.error("Invalid REST configuration: {}", e.getMessage(), e);
+            return 10;
+        }
+        final GroovyScriptRunner groovy = new GroovyScriptRunner(
+                properties.getProperty(GroovyScriptRunner.PROP_GROOVY_SCRIPTS),
+                buildFile,
+                properties,
+                translator);
+        if (!runGroovyStage(groovy, InvocationStage.FIRST, null)) {
+            return 10;
+        }
+
         // Step 1 (the analogue of PME's PomIO.peekAtPomHierarchy): crawl the build-file hierarchy so
         // we know every file we may need to manipulate before touching anything.
         try {
@@ -245,23 +266,14 @@ public class Cli implements Callable<Integer> {
             // lookup/maven/latest endpoint for the highest existing build, then increment its serial (or
             // synthesise redhat-00001 for a first build). The external source of truth decides the base,
             // exactly as PME delegates to the Dependency Analyzer.
-            String restUrl = properties.getProperty(PROP_REST_URL);
-            if (restUrl != null && !restUrl.trim().isEmpty()) {
+            // Collect base version literal -> computed publish version, for the rewrite step.
+            Map<String, String> versionRewrites = new LinkedHashMap<>();
+            if (translator != null) {
                 List<ProjectVersionRef> coordinates = concreteCoordinates(gavs, reconciler);
                 if (coordinates.isEmpty()) {
                     logger.warn("No concrete coordinates to align; skipping lookup.");
                 } else {
                     logger.info("Aligning {} project coordinate(s) against {}", coordinates.size(), restUrl);
-                    Translator translator = new DefaultTranslator(
-                            restUrl,
-                            intProp(PROP_REST_MAX_SIZE, -1),
-                            intProp(PROP_REST_MIN_SIZE, 1),
-                            boolProp(PROP_REST_BREW_PULL),
-                            stringProp(PROP_REST_MODE, "PERSISTENT"),
-                            parseRestHeaders(properties.getProperty(PROP_REST_HEADERS)),
-                            intProp(PROP_REST_CONNECTION_TIMEOUT, Translator.DEFAULT_CONNECTION_TIMEOUT_SEC),
-                            intProp(PROP_REST_SOCKET_TIMEOUT, Translator.DEFAULT_SOCKET_TIMEOUT_SEC),
-                            intProp(PROP_REST_RETRY_DURATION, Translator.RETRY_DURATION_SEC));
                     Map<ProjectVersionRef, String> latest;
                     try {
                         latest = translator.lookupProjectVersions(coordinates);
@@ -275,8 +287,6 @@ public class Cli implements Callable<Integer> {
                             false,
                             properties.getProperty(PROP_VERSION_SUFFIX_STRIP, VersionIncrementer.DEFAULT_DEV_MARKERS));
 
-                    // Collect base version literal -> computed publish version, for the rewrite step.
-                    Map<String, String> versionRewrites = new LinkedHashMap<>();
                     logger.info("Computed publish version(s) for {} coordinate(s):", coordinates.size());
                     for (ProjectVersionRef g : coordinates) {
                         String daLatest = latest.get(g); // null when DA has no prior build
@@ -307,12 +317,45 @@ public class Cli implements Callable<Integer> {
                     rewriteVersions(buildFile.getParentFile(), versionRewrites, reconciler);
                 }
             }
+
+            // LAST-stage Groovy scripts see the final computed versions (and the rewritten files).
+            if (!runGroovyStage(groovy, InvocationStage.LAST, versionRewrites)) {
+                return 10;
+            }
         } catch (Exception e) {
             logger.error("Failed to resolve GAV coordinates from {}: {}", buildFile, e.getMessage(), e);
             return 10;
         }
 
         return 0;
+    }
+
+    /** Runs one stage of Groovy scripts, logging and reporting failure rather than throwing. */
+    private boolean runGroovyStage(
+            GroovyScriptRunner groovy,
+            InvocationStage stage,
+            Map<String, String> alignedVersions) {
+        try {
+            groovy.run(stage, alignedVersions);
+            return true;
+        } catch (RuntimeException e) {
+            logger.error("Groovy script failed: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /** Build the DA client from the {@code rest*} properties. */
+    private Translator createTranslator(String restUrl) {
+        return new DefaultTranslator(
+                restUrl,
+                intProp(PROP_REST_MAX_SIZE, -1),
+                intProp(PROP_REST_MIN_SIZE, 1),
+                boolProp(PROP_REST_BREW_PULL),
+                stringProp(PROP_REST_MODE, "PERSISTENT"),
+                parseRestHeaders(properties.getProperty(PROP_REST_HEADERS)),
+                intProp(PROP_REST_CONNECTION_TIMEOUT, Translator.DEFAULT_CONNECTION_TIMEOUT_SEC),
+                intProp(PROP_REST_SOCKET_TIMEOUT, Translator.DEFAULT_SOCKET_TIMEOUT_SEC),
+                intProp(PROP_REST_RETRY_DURATION, Translator.RETRY_DURATION_SEC));
     }
 
     /**

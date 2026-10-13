@@ -40,6 +40,11 @@
       <artifactId>jcl-over-slf4j</artifactId>
     </dependency>
     <dependency>
+      <!-- Pulled in by core already; declared explicitly so the shade phase includes it. -->
+      <groupId>org.codehaus.groovy</groupId>
+      <artifactId>groovy</artifactId>
+    </dependency>
+    <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
     </dependency>

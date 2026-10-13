@@ -16,6 +16,16 @@
 
   <dependencies>
     <dependency>
+      <!-- Translator (DA REST client) is exposed to Groovy scripts via the script API. -->
+      <groupId>org.jboss.pnc.ant-manipulator</groupId>
+      <artifactId>ant-manipulation-common</artifactId>
+    </dependency>
+    <dependency>
+      <!-- Runs user-supplied manipulation scripts, as PME/GME do. -->
+      <groupId>org.codehaus.groovy</groupId>
+      <artifactId>groovy</artifactId>
+    </dependency>
+    <dependency>
       <!-- Apache Ant itself: we reuse its ProjectHelper to parse build files,
            just as pom-manipulation-ext reuses Maven's model reader for POMs. -->
       <groupId>org.apache.ant</groupId>

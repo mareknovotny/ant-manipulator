@@ -59,6 +59,8 @@
     <!-- Override enforcer requirements -->
     <jdk.min.version>17</jdk.min.version>
 
+    <!-- Same Groovy line as pom-manipulation-ext 5.9, so scripts behave identically across PME and this tool. -->
+    <groovy.version>3.0.25</groovy.version>
     <pme.version>5.9</pme.version>
     <picocli.version>4.7.6</picocli.version>
     <ant.version>1.10.18</ant.version>
@@ -121,6 +123,11 @@
         <groupId>org.apache.ant</groupId>
         <artifactId>ant</artifactId>
         <version>${ant.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.groovy</groupId>
+        <artifactId>groovy</artifactId>
+        <version>${groovy.version}</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
