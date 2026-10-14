@@ -1,8 +1,10 @@
 package org.jboss.pnc.antmanipulator.align;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.jboss.pnc.antmanipulator.align.VersionIncrementer.Result;
+import org.jboss.pnc.antmanipulator.align.VersionIncrementer.UnresolvableVersionException;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -62,16 +64,6 @@ class VersionIncrementerTest {
         void alphaFinalQualifierUsesDashSeparator() {
             assertThat(incrementer.nextVersion("1.0.0.Final", null).getNewVersion())
                     .isEqualTo("1.0.0.Final-redhat-00001");
-        }
-
-        @Test
-        void nullBaseAndNullLatestStillProducesFirstSerial() {
-            // Degenerate input: no base, no DA latest. Should not throw. PME's Version.appendQualifierSuffix
-            // prepends "." (not "-") to an empty stem; getOsgiVersion then leaves it unparsed, unchanged.
-            Result r = incrementer.nextVersion(null, null);
-
-            assertThat(r.getNewVersion()).isEqualTo(".redhat-00001");
-            assertThat(r.isFirstBuild()).isTrue();
         }
 
         @Test
@@ -190,44 +182,47 @@ class VersionIncrementerTest {
     }
 
     @Nested
-    class BareSnapshotHandling {
+    class UnresolvableBaseVersionHandling {
 
         @Test
-        void bareSnapshotBaseIsSkippedRatherThanSynthesised() {
-            // GH #10: "SNAPSHOT" alone has no real base to build a serial from; don't publish the
-            // meaningless "-redhat-00001" — leave it untouched and flag it as skipped.
-            Result r = incrementer.nextVersion("SNAPSHOT", null);
-
-            assertThat(r.getNewVersion()).isEqualTo("SNAPSHOT");
-            assertThat(r.isSkipped()).isTrue();
+        void bareSnapshotBaseThrows() {
+            // GH #10: "SNAPSHOT" alone has no real base to build a serial from. Continuing would publish
+            // the coordinate under a meaningless "-redhat-00001" (or, worse, silently leave it unchanged
+            // with only a log line to notice by) — so this is a hard failure instead.
+            assertThatThrownBy(() -> incrementer.nextVersion("SNAPSHOT", null))
+                    .isInstanceOf(UnresolvableVersionException.class)
+                    .hasMessageContaining("SNAPSHOT");
         }
 
         @Test
         void bareSnapshotIsCaseInsensitive() {
-            Result r = incrementer.nextVersion("snapshot", null);
-
-            assertThat(r.getNewVersion()).isEqualTo("snapshot");
-            assertThat(r.isSkipped()).isTrue();
+            assertThatThrownBy(() -> incrementer.nextVersion("snapshot", null))
+                    .isInstanceOf(UnresolvableVersionException.class);
         }
 
         @Test
-        void bareSnapshotDaLatestIsSkippedRatherThanSynthesised() {
+        void bareSnapshotDaLatestThrows() {
             // DA itself returning a bare "SNAPSHOT" as latestVersion is just as unusable as a declared one.
-            Result r = incrementer.nextVersion("1.2.3", "SNAPSHOT");
-
-            assertThat(r.getNewVersion()).isEqualTo("1.2.3");
-            assertThat(r.isSkipped()).isTrue();
-            assertThat(r.getBasedOn()).isEqualTo("SNAPSHOT");
+            assertThatThrownBy(() -> incrementer.nextVersion("1.2.3", "SNAPSHOT"))
+                    .isInstanceOf(UnresolvableVersionException.class);
         }
 
         @Test
-        void normalFirstBuildIsNeverFlaggedAsSkipped() {
-            assertThat(incrementer.nextVersion("4.13.2", null).isSkipped()).isFalse();
+        void blankDeclaredVersionWithNoDaLatestThrows() {
+            // Degenerate input: no base, no DA latest. PME/Maven/Atlas would never accept a blank or
+            // empty version in the first place, so there is no sane version to synthesise here either.
+            assertThatThrownBy(() -> incrementer.nextVersion(null, null))
+                    .isInstanceOf(UnresolvableVersionException.class);
         }
 
         @Test
-        void normalIncrementIsNeverFlaggedAsSkipped() {
-            assertThat(incrementer.nextVersion("1.0", "1.0-redhat-00003").isSkipped()).isFalse();
+        void normalFirstBuildDoesNotThrow() {
+            assertThat(incrementer.nextVersion("4.13.2", null).getNewVersion()).isNotNull();
+        }
+
+        @Test
+        void normalIncrementDoesNotThrow() {
+            assertThat(incrementer.nextVersion("1.0", "1.0-redhat-00003").getNewVersion()).isNotNull();
         }
     }
 

@@ -115,23 +115,14 @@ public final class VersionIncrementer {
         private final String newVersion;
         private final boolean firstBuild;
         private final String basedOn; // DA's latestVersion, or null for a first build
-        private final boolean skipped;
 
         Result(String newVersion, boolean firstBuild, String basedOn) {
-            this(newVersion, firstBuild, basedOn, false);
-        }
-
-        Result(String newVersion, boolean firstBuild, String basedOn, boolean skipped) {
             this.newVersion = newVersion;
             this.firstBuild = firstBuild;
             this.basedOn = basedOn;
-            this.skipped = skipped;
         }
 
-        /**
-         * The version to publish under, or — when {@link #isSkipped()} — the original, untouched
-         * version.
-         */
+        /** The version to publish under. */
         public String getNewVersion() {
             return newVersion;
         }
@@ -146,23 +137,8 @@ public final class VersionIncrementer {
             return basedOn;
         }
 
-        /**
-         * True when no usable base version remained after stripping SNAPSHOT/dev markers and/or the
-         * redhat suffix (e.g. a bare {@code SNAPSHOT}), so no publish version could be synthesised;
-         * {@link #getNewVersion()} is then just the original, untouched version — the caller should skip
-         * rewriting this coordinate rather than write out a malformed version like {@code -redhat-00001}.
-         * (PME's own {@code VersionCalculator} has this same gap for a bare {@code SNAPSHOT} — it isn't
-         * something adopting PME's code solves for us.)
-         */
-        public boolean isSkipped() {
-            return skipped;
-        }
-
         /** A one-line, human-readable outcome suitable for logging. */
         public String summarize() {
-            if (skipped) {
-                return newVersion + "  (kept unchanged — no usable base version)";
-            }
             return firstBuild
                     ? newVersion + "  (first build)"
                     : newVersion + "  (increment of " + basedOn + ")";
@@ -170,9 +146,26 @@ public final class VersionIncrementer {
     }
 
     /**
+     * Thrown when no usable base version remains after stripping SNAPSHOT/dev markers and/or the rebuild
+     * suffix (e.g. a declared version that is literally {@code SNAPSHOT}, or a blank/missing one), so no
+     * publish version can be synthesised. This is a hard failure rather than a logged warning: silently
+     * leaving the coordinate's old version in place would risk publishing it unchanged with nothing but a
+     * log line to notice by, so instead we force the user to fix the declared version (or DA's recorded
+     * build) before the run can proceed. (PME's own {@code VersionCalculator} has this same gap for a bare
+     * {@code SNAPSHOT} — confirmed empirically it produces {@code .redhat-00001} — so adopting its code
+     * wouldn't have solved this for us either; it still needs to be caught explicitly.)
+     */
+    public static final class UnresolvableVersionException extends RuntimeException {
+        UnresolvableVersionException(String message) {
+            super(message);
+        }
+    }
+
+    /**
      * @param baseVersion the project's declared version (e.g. {@code 3.8-beta1}); used only for a first build
      * @param daLatest DA's {@code latestVersion} for this coordinate, or {@code null} if never built
      * @return the computed publish version
+     * @throws UnresolvableVersionException if no usable base version remains to compute one from
      */
     public Result nextVersion(String baseVersion, String daLatest) {
         if (daLatest != null && !daLatest.trim().isEmpty()) {
@@ -188,46 +181,38 @@ public final class VersionIncrementer {
                 int next = Integer.parseInt(serialText) + 1;
                 int width = Math.max(serialText.length(), padding);
                 String stem = latestStem.substring(0, m.start());
-                if (stem.trim().isEmpty()) {
-                    // DA's latestVersion is just a bare "<suffix>-<serial>" with no stem of its own
-                    // (malformed/unexpected DA data): don't synthesise "-redhat-<serial>".
-                    return skip(baseVersion, latest);
-                }
+                // DA's latestVersion is just a bare "<suffix>-<serial>" with no stem of its own
+                // (malformed/unexpected DA data): don't synthesise "-redhat-<serial>".
+                requireUsableStem(stem, latest);
                 return new Result(
                         withSnapshot(stem + sep + suffixBase + "-" + pad(next, width), hadSnapshot),
                         false,
                         latest);
             }
-            if (latestStem.trim().isEmpty()) {
-                // DA's latestVersion reduces to nothing once SNAPSHOT/dev markers are stripped
-                // (e.g. a bare "SNAPSHOT"): there's no real base to build the first serial from.
-                return skip(baseVersion, latest);
-            }
+            // DA's latestVersion may reduce to nothing once SNAPSHOT/dev markers are stripped (e.g. a
+            // bare "SNAPSHOT"): there's no real base to build the first serial from.
+            requireUsableStem(latestStem, latest);
             // DA returned a version without a recognisable redhat suffix: treat it as the stem for
             // the first serial rather than the declared base (DA's form is the authoritative one).
             return new Result(firstBuildOf(latestStem, hadSnapshot), true, latest);
         }
         String base = baseVersion == null ? "" : baseVersion.trim();
-        if (base.isEmpty()) {
-            // No declared version and no DA latest either; degenerate input, but don't throw.
-            return new Result(firstBuildOf(base, false), true, null);
-        }
         boolean hadSnapshot = Version.isSnapshot(base);
         String baseStem = stripDevTails(Version.removeSnapshot(base));
-        if (baseStem.trim().isEmpty()) {
-            // The declared version is literally (or reduces to) "SNAPSHOT": there's no real base
-            // to build the first serial from. Leave it untouched rather than publish "-redhat-00001".
-            // (Confirmed empirically against PME's real VersionCalculator: it has this exact gap too,
-            // producing ".redhat-00001" for a bare "SNAPSHOT" — adopting PME's code doesn't fix this.)
-            return skip(baseVersion, null);
-        }
+        // The declared version may be blank, or literally (or reduce to) "SNAPSHOT": there's no real
+        // base to build the first serial from.
+        requireUsableStem(baseStem, baseVersion);
         return new Result(firstBuildOf(baseStem, hadSnapshot), true, null);
     }
 
-    /** No usable base version remained; leave the coordinate's declared version untouched. */
-    private static Result skip(String baseVersion, String basedOn) {
-        String original = baseVersion == null ? "" : baseVersion.trim();
-        return new Result(original, true, basedOn, true);
+    /** @throws UnresolvableVersionException if {@code stem} has no usable content once trimmed */
+    private static void requireUsableStem(String stem, String original) {
+        if (stem == null || stem.trim().isEmpty()) {
+            throw new UnresolvableVersionException(
+                    "Cannot compute a publish version from '" + original + "': no usable base version "
+                            + "remains after stripping SNAPSHOT/dev markers and/or the rebuild suffix. "
+                            + "Fix the declared version.");
+        }
     }
 
     /**
