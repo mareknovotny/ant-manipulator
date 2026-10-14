@@ -57,6 +57,32 @@ class GroovyScriptRunnerTest {
     }
 
     @Test
+    void preparseIsAliasForFirst() throws IOException {
+        File s = script(
+                "a.groovy",
+                HEADER + "@InvocationPoint(invocationPoint = InvocationStage.PREPARSE)\n"
+                        + "@AMEBaseScript BaseScript ame\n"
+                        + "new File(ame.getBaseDir(), 'out.txt').text = ame.getInvocationStage().toString()\n");
+
+        runner(s.getAbsolutePath(), new Properties()).run(InvocationStage.FIRST, null);
+
+        assertThat(dir.resolve("out.txt")).hasContent("FIRST");
+    }
+
+    @Test
+    void preparseDoesNotMatchLast() throws IOException {
+        File s = script(
+                "a.groovy",
+                HEADER + "@InvocationPoint(invocationPoint = InvocationStage.PREPARSE)\n"
+                        + "@AMEBaseScript BaseScript ame\n"
+                        + "new File(ame.getBaseDir(), 'out.txt').text = 'ran'\n");
+
+        runner(s.getAbsolutePath(), new Properties()).run(InvocationStage.LAST, null);
+
+        assertThat(dir.resolve("out.txt")).doesNotExist();
+    }
+
+    @Test
     void scriptIsSkippedWhenStageDoesNotMatch() throws IOException {
         File s = script(
                 "a.groovy",

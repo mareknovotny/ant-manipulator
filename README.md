@@ -134,6 +134,7 @@ f.text = f.text.replace('value="1.0-dev"', 'value="1.0"')
 | Stage | Runs |
 | --- | --- |
 | `FIRST` | Before any build file is read. Safe to edit build files on disk; the pipeline then aligns the edited files. |
+| `PREPARSE` | Alias for `FIRST`, for parity with GME's vocabulary. |
 | `LAST` | After versions are computed and (unless `--preview`) rewritten. |
 | `ALL` | At both stages; use `getInvocationStage()` to tell them apart. |
 

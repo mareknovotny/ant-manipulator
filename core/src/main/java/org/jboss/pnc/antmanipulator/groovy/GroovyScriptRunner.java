@@ -28,7 +28,8 @@ import groovy.lang.Script;
  *
  * <p>
  * Each script must be annotated with {@link InvocationPoint} and {@link AMEBaseScript}; it is run only
- * when its declared stage is the current stage ({@link InvocationStage#ALL} matches every stage).
+ * when its declared stage is the current stage ({@link InvocationStage#ALL} matches every stage,
+ * {@link InvocationStage#PREPARSE} matches {@link InvocationStage#FIRST}).
  */
 public final class GroovyScriptRunner {
 
@@ -85,7 +86,8 @@ public final class GroovyScriptRunner {
         Script script = parsedScripts.computeIfAbsent(location, this::parseScript);
 
         InvocationStage declared = script.getClass().getAnnotation(InvocationPoint.class).invocationPoint();
-        if (declared != InvocationStage.ALL && declared != stage) {
+        InvocationStage effectiveDeclared = declared == InvocationStage.PREPARSE ? InvocationStage.FIRST : declared;
+        if (effectiveDeclared != InvocationStage.ALL && effectiveDeclared != stage) {
             logger.debug(
                     "Ignoring script {} as invocation point {} does not match stage {}",
                     location,
