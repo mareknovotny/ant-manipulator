@@ -279,25 +279,26 @@ public class Cli implements Callable<Integer> {
                     logger.info("Computed publish version(s) for {} coordinate(s):", coordinates.size());
                     for (ProjectVersionRef g : coordinates) {
                         String daLatest = latest.get(g); // null when DA has no prior build
-                        VersionIncrementer.Result r = incrementer.nextVersion(g.getVersionString(), daLatest);
+                        VersionIncrementer.Result r;
+                        try {
+                            r = incrementer.nextVersion(g.getVersionString(), daLatest);
+                        } catch (VersionIncrementer.UnresolvableVersionException e) {
+                            // No usable base version (e.g. a bare "SNAPSHOT"): abort rather than silently
+                            // publish this coordinate under its old, unchanged version.
+                            logger.error(
+                                    "Cannot compute a publish version for {}:{}:{}: {}",
+                                    g.getGroupId(),
+                                    g.getArtifactId(),
+                                    g.getVersionString(),
+                                    e.getMessage());
+                            return 10;
+                        }
                         logger.info(
                                 "    {}:{}:{} -> {}",
                                 g.getGroupId(),
                                 g.getArtifactId(),
                                 g.getVersionString(),
                                 r.summarize());
-
-                        if (r.isSkipped()) {
-                            // No usable base version (e.g. a bare "SNAPSHOT"): leave this coordinate's
-                            // version untouched rather than write out a malformed one.
-                            logger.warn(
-                                    "{}:{}:{} has no usable base version to compute a publish version "
-                                            + "from; leaving it unchanged.",
-                                    g.getGroupId(),
-                                    g.getArtifactId(),
-                                    g.getVersionString());
-                            continue;
-                        }
 
                         String base = g.getVersionString();
                         String prior = versionRewrites.putIfAbsent(base, r.getNewVersion());
