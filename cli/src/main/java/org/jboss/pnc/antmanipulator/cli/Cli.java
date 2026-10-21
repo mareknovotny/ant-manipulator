@@ -23,6 +23,7 @@ import org.jboss.pnc.antmanipulator.groovy.GroovyScriptRunner;
 import org.jboss.pnc.antmanipulator.groovy.InvocationStage;
 import org.jboss.pnc.antmanipulator.report.AlignmentReport;
 import org.jboss.pnc.antmanipulator.report.PmeAlignmentReport;
+import org.jboss.pnc.mavenmanipulator.common.exception.ManipulationException;
 import org.jboss.pnc.mavenmanipulator.common.json.PME;
 import org.jboss.pnc.mavenmanipulator.io.rest.DefaultTranslator;
 import org.jboss.pnc.mavenmanipulator.io.rest.RestException;
@@ -300,7 +301,7 @@ public class Cli implements Callable<Integer> {
                         VersionIncrementer.Result r;
                         try {
                             r = incrementer.nextVersion(g.getVersionString(), daLatest);
-                        } catch (VersionIncrementer.UnresolvableVersionException e) {
+                        } catch (ManipulationException e) {
                             // No usable base version (e.g. a bare "SNAPSHOT"): abort rather than silently
                             // publish this coordinate under its old, unchanged version.
                             logger.error(

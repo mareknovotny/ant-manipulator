@@ -6,6 +6,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.jboss.pnc.mavenmanipulator.common.Version;
+import org.jboss.pnc.mavenmanipulator.common.exception.ManipulationException;
 
 /**
  * Computes the version a project should be <em>published</em> under — the analogue of PME's
@@ -146,28 +147,20 @@ public final class VersionIncrementer {
     }
 
     /**
-     * Thrown when no usable base version remains after stripping SNAPSHOT/dev markers and/or the rebuild
-     * suffix (e.g. a declared version that is literally {@code SNAPSHOT}, or a blank/missing one), so no
-     * publish version can be synthesised. This is a hard failure rather than a logged warning: silently
-     * leaving the coordinate's old version in place would risk publishing it unchanged with nothing but a
-     * log line to notice by, so instead we force the user to fix the declared version (or DA's recorded
-     * build) before the run can proceed. (PME's own {@code VersionCalculator} has this same gap for a bare
-     * {@code SNAPSHOT} — confirmed empirically it produces {@code .redhat-00001} — so adopting its code
-     * wouldn't have solved this for us either; it still needs to be caught explicitly.)
-     */
-    public static final class UnresolvableVersionException extends RuntimeException {
-        UnresolvableVersionException(String message) {
-            super(message);
-        }
-    }
-
-    /**
      * @param baseVersion the project's declared version (e.g. {@code 3.8-beta1}); used only for a first build
      * @param daLatest DA's {@code latestVersion} for this coordinate, or {@code null} if never built
      * @return the computed publish version
-     * @throws UnresolvableVersionException if no usable base version remains to compute one from
+     * @throws ManipulationException if no usable base version remains after stripping SNAPSHOT/dev markers
+     *         and/or the rebuild suffix (e.g. a declared version that is literally {@code SNAPSHOT}, or a
+     *         blank/missing one), so no publish version can be synthesised. This is a hard failure rather
+     *         than a logged warning: silently leaving the coordinate's old version in place would risk
+     *         publishing it unchanged with nothing but a log line to notice by, so instead we force the
+     *         user to fix the declared version (or DA's recorded build) before the run can proceed. (PME's
+     *         own {@code VersionCalculator} has this same gap for a bare {@code SNAPSHOT} — confirmed
+     *         empirically it produces {@code .redhat-00001} — so adopting its code wouldn't have solved
+     *         this for us either; it still needs to be caught explicitly.)
      */
-    public Result nextVersion(String baseVersion, String daLatest) {
+    public Result nextVersion(String baseVersion, String daLatest) throws ManipulationException {
         if (daLatest != null && !daLatest.trim().isEmpty()) {
             String latest = daLatest.trim();
             // Follow PME's removeSnapshot: never carry -SNAPSHOT through into the rebuild version.
@@ -205,10 +198,10 @@ public final class VersionIncrementer {
         return new Result(firstBuildOf(baseStem, hadSnapshot), true, null);
     }
 
-    /** @throws UnresolvableVersionException if {@code stem} has no usable content once trimmed */
-    private static void requireUsableStem(String stem, String original) {
+    /** @throws ManipulationException if {@code stem} has no usable content once trimmed */
+    private static void requireUsableStem(String stem, String original) throws ManipulationException {
         if (stem == null || stem.trim().isEmpty()) {
-            throw new UnresolvableVersionException(
+            throw new ManipulationException(
                     "Cannot compute a publish version from '" + original + "': no usable base version "
                             + "remains after stripping SNAPSHOT/dev markers and/or the rebuild suffix. "
                             + "Fix the declared version.");

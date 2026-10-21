@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn -q -pl integration-test -am install -DskipTests)",
+      "Bash(mvn -q failsafe:integration-test -Dit.test=JacksonAntProjectIT)",
+      "Bash(mvn -q -pl common,core -am install -DskipTests)",
+      "Bash(echo \"MVN_EXIT=$?\")",
+      "Bash(mvn -q failsafe:integration-test failsafe:verify -Dit.test=JacksonAntProjectIT)",
+      "Bash(gh issue *)",
+      "Bash(mvn -q -pl core dependency:tree -Dincludes=com.fasterxml.jackson*)",
+      "Bash(mvn -q dependency:tree -Dincludes=com.fasterxml.jackson*)",
+      "Bash(mvn dependency:tree -Dincludes=com.fasterxml.jackson*)",
+      "Bash(mvn -q -pl core test -Dtest=AlignmentReportTest)",
+      "Bash(mvn -q -pl core test -Dtest=AlignmentReportTest,PmeAlignmentReportTest)",
+      "Bash(mvn dependency:tree)",
+      "Bash(awk 'NR>3 && $4 { *)",
+      "Bash(awk 'NR>3 && $4 ~ /^org\\\\/apache\\\\// { split\\($4,p,\"/\"\\); k=p[1]\"/\"p[2]\"/\"p[3]; size[k]+=$1 } END { for \\(k in size\\) printf \"%8.1f KB  %s\\\\n\", size[k]/1024, k }')",
+      "Bash(mvn dependency:tree -Dincludes=org.jetbrains.kotlin:*,com.squareup.okhttp3:*,com.squareup.okio:*,io.opentelemetry:opentelemetry-exporter-otlp,io.opentelemetry:opentelemetry-exporter-otlp-common,io.opentelemetry:opentelemetry-exporter-common,io.opentelemetry:opentelemetry-exporter-sender-okhttp)",
+      "Bash(mvn -q clean package)",
+      "Bash(gh repo *)",
+      "Bash(awk '/^@@ -53,17 \\\\+53,51 @@/{flag=1; next} /^@@ -118,13/{flag=0} flag' /tmp/pr39.diff)",
+      "Bash(awk '{print}')",
+      "Bash(python3 -I -)",
+      "Bash(python3 -I -c ' *)"
+    ]
+  }
+}
