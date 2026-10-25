@@ -124,6 +124,31 @@ class PmeAlignmentReportTest {
     }
 
     @Test
+    void buildUnchangedReportsExecutionRootAtDeclaredVersion() {
+        File buildFile = new File(tempDir, "build.xml");
+        GavCorrelator.Result correlated = correlator.correlate(
+                Collections.singletonList(
+                        new ResolvedGav(
+                                "org.acme",
+                                "widget",
+                                "1.0",
+                                buildFile,
+                                "detail",
+                                SourceKind.POM_TEMPLATE,
+                                Confidence.HIGH)));
+
+        PME report = PmeAlignmentReport.buildUnchanged(buildFile, correlated, reconciler());
+
+        // Nothing is realigned, so there are no module entries...
+        assertThat(report.getModules()).isEmpty();
+        // ...but the execution root still carries the project's *unchanged* coordinate, so PNC/Repour can
+        // record and tag the build under its declared version (original == new, no suffix).
+        assertThat(report.getGav().getArtifactId()).isEqualTo("widget");
+        assertThat(report.getGav().getOriginalGAV()).isEqualTo("org.acme:widget:1.0");
+        assertThat(report.getGav().getVersion()).isEqualTo("1.0");
+    }
+
+    @Test
     void writeToProducesPmeShapedJson() throws Exception {
         File buildFile = new File(tempDir, "build.xml");
         GavCorrelator.Result correlated = correlator.correlate(

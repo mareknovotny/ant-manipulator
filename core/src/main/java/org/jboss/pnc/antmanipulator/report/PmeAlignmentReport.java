@@ -88,6 +88,83 @@ public final class PmeAlignmentReport {
         return report;
     }
 
+    /**
+     * Builds a report for a run with version modification disabled ({@code -DversionModification=false}): nothing
+     * was realigned, so there are no module entries, but PNC/Repour still needs the execution root's coordinate
+     * to record and tag the build — under its <em>declared</em> (unchanged) version. The execution root is chosen
+     * exactly as {@link #build} does (an artifact declared in the root build file, else the first concrete one by
+     * groupId:artifactId order) and reported with its original version as both the before and after value.
+     *
+     * @param rootBuildFile the build file passed to {@code -f}, used to pick the {@code executionRoot} artifact
+     * @param correlated every artifact this run discovered, correlated by groupId:artifactId
+     * @param reconciler resolves a tokenised version to its concrete value(s)
+     * @return a report whose {@code executionRoot} is the unchanged project coordinate; empty if none is concrete
+     */
+    public static PME buildUnchanged(
+            File rootBuildFile,
+            GavCorrelator.Result correlated,
+            VersionReconciler reconciler) {
+
+        PME report = new PME();
+        CorrelatedGav executionRoot = null;
+        String executionRootVersion = null;
+
+        for (CorrelatedGav artifact : correlated.getArtifacts()) {
+            String version = concreteVersionOf(artifact, reconciler);
+            if (version == null) {
+                continue;
+            }
+            if (executionRoot == null) {
+                executionRoot = artifact; // fallback: first concrete artifact, in groupId:artifactId order
+                executionRootVersion = version;
+            }
+            if (isDeclaredIn(artifact, rootBuildFile)) {
+                executionRoot = artifact; // prefer one actually declared in the root build file
+                executionRootVersion = version;
+                break;
+            }
+        }
+
+        if (executionRoot != null) {
+            report.getGav()
+                    .setOriginalGAV(
+                            executionRoot.getGroupId() + ":" + executionRoot.getArtifactId() + ":"
+                                    + executionRootVersion);
+            report.getGav()
+                    .setPVR(
+                            new SimpleProjectVersionRef(
+                                    executionRoot.getGroupId(),
+                                    executionRoot.getArtifactId(),
+                                    executionRootVersion));
+        }
+
+        return report;
+    }
+
+    /**
+     * The artifact's concrete version: its primary version if already concrete, else the (deterministically
+     * chosen, release-preferring) first value a tokenised primary reconciles to, or {@code null} if it has no
+     * usable groupId/artifactId or its version does not resolve.
+     */
+    private static String concreteVersionOf(CorrelatedGav artifact, VersionReconciler reconciler) {
+        if (isBlank(artifact.getGroupId()) || isBlank(artifact.getArtifactId())) {
+            return null;
+        }
+        String primary = artifact.primaryVersion();
+        if (primary == null) {
+            return null;
+        }
+        if (!artifact.tokenizedVersions().contains(primary)) {
+            return primary;
+        }
+        Set<String> resolved = reconciler.reconcile(primary).getResolved();
+        return resolved.isEmpty() ? null : new TreeSet<>(resolved).first();
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
+    }
+
     /** Write {@code report} to {@code file} using PME's own serialisation (pretty-printed, nulls/empties omitted). */
     public static File writeTo(PME report, File file) throws IOException {
         // UTF-8 explicitly (not JVM default charset) so non-ASCII coordinates serialise to the same bytes on

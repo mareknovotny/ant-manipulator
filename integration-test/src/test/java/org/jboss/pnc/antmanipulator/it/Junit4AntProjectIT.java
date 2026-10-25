@@ -129,6 +129,38 @@ class Junit4AntProjectIT {
                 .contains("<filter token=\"version\" value=\"4.8.0.redhat-00001\" />");
     }
 
+    @Test
+    void versionModificationFalseLeavesTheDeclaredVersionUntouched() throws IOException {
+        String before = readFile(buildFile);
+        daServer = stubFirstBuildDaServer();
+
+        // A sentinel suffix paired with versionModification=false must suppress the suffix entirely and
+        // publish under the declared (upstream) version: no DA lookup applied, no increment, no rewrite.
+        int exitCode = new Cli().run(
+                new String[] {
+                        "-f",
+                        buildFile.getAbsolutePath(),
+                        "-Dalignment.groupId=junit",
+                        "-Dalignment.artifactId=junit",
+                        "-DrestURL=" + daBaseUrl(),
+                        "-DversionIncrementalSuffix=not-used",
+                        "-DversionModification=false",
+                        "-DreportJsonUnchanged=true" });
+
+        assertThat(exitCode).isEqualTo(0);
+
+        // The build file is left exactly as-is.
+        assertThat(readFile(buildFile)).isEqualTo(before);
+
+        // The report still records the execution root, but at its declared, unqualified version - and the
+        // sentinel suffix never appears.
+        String report = readFile(projectDir.resolve("alignmentReport.json").toFile());
+        assertThat(report)
+                .contains("\"executionRoot\"")
+                .contains("junit:junit:4.8")
+                .doesNotContain("not-used");
+    }
+
     private WireMockServer stubFirstBuildDaServer() {
         WireMockServer server = new WireMockServer(WireMockConfiguration.options().dynamicPort());
         server.start();

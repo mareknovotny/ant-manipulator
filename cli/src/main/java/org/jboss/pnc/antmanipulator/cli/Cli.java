@@ -76,6 +76,14 @@ public class Cli implements Callable<Integer> {
     static final String PROP_DISCOVERY_REPORT_JSON = "discoveryReportJSONOutputFile";
     /** antalignment-specific (no PME equivalent): dev markers stripped like {@code -SNAPSHOT}. */
     static final String PROP_VERSION_SUFFIX_STRIP = "versionSuffixStrip";
+    /**
+     * PME's {@code versionModification} (default {@code true}). When {@code false}, the project's own version is
+     * left untouched: no DA lookup, no computed suffix, no rewrite — the build publishes under its declared
+     * version. PNC sets this for build categories meant to publish under the upstream version, pairing it with a
+     * sentinel {@code versionIncrementalSuffix} that must never be applied. PME honours the flag, so AME must
+     * too; otherwise that sentinel suffix leaks onto the artifacts.
+     */
+    static final String PROP_VERSION_MODIFICATION = "versionModification";
 
     /**
      * The build file to operate against. Defaults to {@code build.xml} in the current directory,
@@ -279,8 +287,16 @@ public class Cli implements Callable<Integer> {
             // synthesise redhat-00001 for a first build). The external source of truth decides the base,
             // exactly as PME delegates to the Dependency Analyzer.
             // Collect base version literal -> computed publish version, for the rewrite step.
+            // PME's versionModification (default true): when false, the project version is left untouched —
+            // skip the DA lookup, the increment and the rewrite entirely, so the build publishes under its
+            // declared version. (PME honours this; AME must too, else a sentinel suffix leaks onto artifacts.)
+            final boolean versionModification = boolProp(PROP_VERSION_MODIFICATION, true);
             Map<String, String> versionRewrites = new LinkedHashMap<>();
-            if (translator != null) {
+            if (!versionModification) {
+                logger.info(
+                        "versionModification=false: leaving the project version unchanged "
+                                + "(skipping DA lookup, version increment and rewrite).");
+            } else if (translator != null) {
                 List<ProjectVersionRef> coordinates = concreteCoordinates(gavs, reconciler);
                 if (coordinates.isEmpty()) {
                     logger.warn("No concrete coordinates to align; skipping lookup.");
@@ -348,7 +364,11 @@ public class Cli implements Callable<Integer> {
             // output exactly like PME's and GME's.
             boolean reportJsonUnchanged = Boolean
                     .parseBoolean(properties.getProperty(PROP_REPORT_JSON_UNCHANGED, "false"));
-            PME pmeReport = PmeAlignmentReport.build(buildFile, correlated, reconciler, versionRewrites);
+            // With versionModification=false nothing was realigned, but PNC/Repour still needs the execution
+            // root's (unchanged) coordinate to record and tag the build under its declared version.
+            PME pmeReport = versionModification
+                    ? PmeAlignmentReport.build(buildFile, correlated, reconciler, versionRewrites)
+                    : PmeAlignmentReport.buildUnchanged(buildFile, correlated, reconciler);
             if (!pmeReport.getModules().isEmpty() || reportJsonUnchanged) {
                 String reportPath = properties.getProperty(PROP_REPORT_JSON);
                 File out = reportPath != null && !reportPath.trim().isEmpty()
@@ -517,6 +537,12 @@ public class Cli implements Callable<Integer> {
     private Boolean boolProp(String key) {
         String v = properties.getProperty(key);
         return v == null ? null : Boolean.valueOf(v.trim());
+    }
+
+    /** The property parsed as a boolean, or {@code fallback} when unset/blank. */
+    private boolean boolProp(String key, boolean fallback) {
+        String v = properties.getProperty(key);
+        return (v == null || v.trim().isEmpty()) ? fallback : Boolean.parseBoolean(v.trim());
     }
 
     /** The property parsed as an int, or {@code null} when unset. */
