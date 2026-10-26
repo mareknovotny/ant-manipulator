@@ -43,7 +43,7 @@ build files are left byte-for-byte as they were, and the build publishes under i
 
 PNC sets `versionModification=false` for build categories meant to publish
 under the upstream version, pairing it with a sentinel `versionIncrementalSuffix` that must never be
-applied. Because PME honors the flag and short-circuits before touching the version, ant-manipulator
+applied. Because PME honours the flag and short-circuits before touching the version, ant-manipulator
 must too — otherwise that sentinel suffix would be used as a versioning part in the published artifacts.
 
 Even with modification disabled, the [PME alignment report](report.html#pme-alignment-report) still
