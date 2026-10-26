@@ -25,6 +25,7 @@ import org.jboss.pnc.antmanipulator.report.AlignmentReport;
 import org.jboss.pnc.antmanipulator.report.PmeAlignmentReport;
 import org.jboss.pnc.mavenmanipulator.common.exception.ManipulationException;
 import org.jboss.pnc.mavenmanipulator.common.json.PME;
+import org.jboss.pnc.mavenmanipulator.common.util.ManifestUtils;
 import org.jboss.pnc.mavenmanipulator.io.rest.DefaultTranslator;
 import org.jboss.pnc.mavenmanipulator.io.rest.RestException;
 import org.jboss.pnc.mavenmanipulator.io.rest.Translator;
@@ -142,6 +143,11 @@ public class Cli implements Callable<Integer> {
 
         final File buildFile = target.getAbsoluteFile();
 
+        logger.info(
+                "Running Ant Manipulation {} against Ant build file: {}",
+                ManifestUtils.getManifestInformation(Cli.class),
+                buildFile);
+
         if (!buildFile.exists()) {
             logger.error("Manipulation engine disabled. Build file {} cannot be found.", buildFile);
             return 10;
@@ -150,8 +156,6 @@ public class Cli implements Callable<Integer> {
             logger.error("Target {} is a directory, not an Ant build file.", buildFile);
             return 10;
         }
-
-        logger.info("Operating against Ant build file: {}", buildFile);
 
         // Groovy scripts (-DgroovyScripts=...), as in PME/GME: FIRST-stage scripts run before anything is read,
         // so they may edit build files on disk; LAST-stage scripts run after the versions are rewritten.
