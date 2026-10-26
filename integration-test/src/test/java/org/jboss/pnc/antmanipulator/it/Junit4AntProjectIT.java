@@ -2,6 +2,7 @@ package org.jboss.pnc.antmanipulator.it;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -149,6 +150,13 @@ class Junit4AntProjectIT {
 
         assertThat(exitCode).isEqualTo(0);
 
+        // versionModification=false must short-circuit *before* any DA network round-trip: the stubbed DA
+        // server must have received zero lookups. This is the real guarantee issue #45 cares about - not just
+        // that the output happened to stay unchanged, but that no live DA call (e.g. restSocketTimeout=3600)
+        // was ever made. Asserting it here stops a future refactor that looks up DA and then discards the
+        // result from silently passing on unchanged content alone.
+        daServer.verify(0, postRequestedFor(urlEqualTo("/lookup/maven/latest")));
+
         // The build file is left exactly as-is.
         assertThat(readFile(buildFile)).isEqualTo(before);
 
@@ -183,6 +191,10 @@ class Junit4AntProjectIT {
                         "-DreportJsonUnchanged=true" });
 
         assertThat(exitCode).isEqualTo(0);
+
+        // Same guarantee as the explicit =false case: an empty value parses to false, so DA must never be
+        // contacted.
+        daServer.verify(0, postRequestedFor(urlEqualTo("/lookup/maven/latest")));
 
         // The build file is left exactly as-is.
         assertThat(readFile(buildFile)).isEqualTo(before);
