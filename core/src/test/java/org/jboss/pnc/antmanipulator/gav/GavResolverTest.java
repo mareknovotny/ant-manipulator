@@ -7,8 +7,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 
 import org.jboss.pnc.antmanipulator.gav.ResolvedGav.Confidence;
 import org.jboss.pnc.antmanipulator.gav.ResolvedGav.SourceKind;
@@ -299,5 +302,82 @@ class GavResolverTest {
         // The HIGH-confidence pom template must sort ahead of the LOW-confidence property finding.
         assertThat(all.get(0).getConfidence()).isEqualTo(Confidence.HIGH);
         assertThat(all).extracting(ResolvedGav::getConfidence).isSorted();
+    }
+
+    // ---- unreferenced nested build.xml exclusion (GitHub issue #44) ----
+
+    /**
+     * Mirrors Apache Commons Net's {@code NET_1_4_0} tag: a root project plus a {@code proposal/ftp2}
+     * subdirectory that is a wholly separate, self-contained Ant project (its own {@code build.xml} and
+     * {@code project.xml}) bundled in the source tree but never invoked by the root build — e.g. an
+     * abandoned sandbox proposal. Its coordinate must not leak into alignment at all, so it also can't
+     * ever be mistaken for the execution root.
+     */
+    private File writeCommonsNetLikeTree(Path dir) throws IOException {
+        File build = write(dir, "build.xml", "<project name=\"p\"/>");
+        write(dir, "project.xml", "<project><id>commons-net</id><currentVersion>1.4.0</currentVersion></project>");
+        Files.createDirectories(dir.resolve("proposal/ftp2"));
+        write(dir.resolve("proposal/ftp2"), "build.xml", "<project name=\"ftp2\"/>");
+        write(
+                dir.resolve("proposal/ftp2"),
+                "project.xml",
+                "<project><id>commons-net-ftp2</id><currentVersion>SNAPSHOT</currentVersion></project>");
+        return build;
+    }
+
+    @Test
+    void nestedDirWithUnreferencedBuildXmlIsExcluded(@TempDir Path dir) throws IOException {
+        File build = writeCommonsNetLikeTree(dir);
+        Set<File> reachable = Collections.singleton(build.getCanonicalFile()); // only the root was crawled
+
+        List<ResolvedGav> m1 = ofKind(resolver.resolve(build, new Properties(), reachable), SourceKind.MAVEN1_POM);
+
+        assertThat(m1).extracting(ResolvedGav::coordinate).containsExactly("commons-net:commons-net:1.4.0");
+    }
+
+    @Test
+    void nestedDirWithReferencedBuildXmlIsIncluded(@TempDir Path dir) throws IOException {
+        File build = writeCommonsNetLikeTree(dir);
+        File ftp2Build = dir.resolve("proposal/ftp2/build.xml").toFile();
+        Set<File> reachable = new LinkedHashSet<>();
+        reachable.add(build.getCanonicalFile());
+        reachable.add(ftp2Build.getCanonicalFile()); // this time Ant actually reaches it, e.g. via <subant>
+
+        List<ResolvedGav> m1 = ofKind(resolver.resolve(build, new Properties(), reachable), SourceKind.MAVEN1_POM);
+
+        assertThat(m1).extracting(ResolvedGav::coordinate)
+                .containsExactlyInAnyOrder(
+                        "commons-net:commons-net:1.4.0",
+                        "commons-net-ftp2:commons-net-ftp2:SNAPSHOT");
+    }
+
+    @Test
+    void nullReachableSetExcludesNothing(@TempDir Path dir) throws IOException {
+        // The 1- and 2-arg overloads (hierarchy not crawled) must keep today's behaviour: no exclusion.
+        File build = writeCommonsNetLikeTree(dir);
+
+        List<ResolvedGav> m1 = ofKind(resolver.resolve(build), SourceKind.MAVEN1_POM);
+
+        assertThat(m1).extracting(ResolvedGav::coordinate)
+                .containsExactlyInAnyOrder(
+                        "commons-net:commons-net:1.4.0",
+                        "commons-net-ftp2:commons-net-ftp2:SNAPSHOT");
+    }
+
+    @Test
+    void nestedDirWithoutOwnBuildXmlIsNeverExcluded(@TempDir Path dir) throws IOException {
+        // A subdirectory with no build.xml of its own (e.g. a plain src/ layout) isn't a separate Ant
+        // project at all, so it must stay in scope regardless of the reachable set.
+        File build = write(dir, "build.xml", "<project name=\"p\"/>");
+        Files.createDirectories(dir.resolve("module"));
+        write(
+                dir.resolve("module"),
+                "project.xml",
+                "<project><id>widget</id><currentVersion>2.0</currentVersion></project>");
+        Set<File> reachable = Collections.singleton(build.getCanonicalFile());
+
+        List<ResolvedGav> m1 = ofKind(resolver.resolve(build, new Properties(), reachable), SourceKind.MAVEN1_POM);
+
+        assertThat(m1).extracting(ResolvedGav::coordinate).containsExactly("widget:widget:2.0");
     }
 }

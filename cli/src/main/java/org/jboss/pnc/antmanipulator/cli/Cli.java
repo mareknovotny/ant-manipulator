@@ -189,9 +189,13 @@ public class Cli implements Callable<Integer> {
         }
 
         // Step 1 (the analogue of PME's PomIO.peekAtPomHierarchy): crawl the build-file hierarchy so
-        // we know every file we may need to manipulate before touching anything.
+        // we know every file we may need to manipulate before touching anything. Also tells Step 2 which
+        // build.xml files Ant actually reaches from here, so e.g. an abandoned sandbox proposal bundled
+        // alongside the real sources under its own unreferenced build.xml (GitHub issue #44) isn't
+        // treated as part of this build.
+        final BuildFileScanner.ScanResult scan;
         try {
-            BuildFileScanner.ScanResult scan = new BuildFileScanner().crawl(buildFile);
+            scan = new BuildFileScanner().crawl(buildFile);
 
             logger.info("Discovered {} build file(s) in the hierarchy:", scan.getPeeks().size());
             for (RawBuildFilePeek peek : scan.getPeeks()) {
@@ -225,7 +229,11 @@ public class Cli implements Callable<Integer> {
         // Step 2 (the analogue of reading GAV off the Maven model): Ant has no canonical place for
         // coordinates and one build may publish many, so we gather every candidate with provenance.
         try {
-            List<ResolvedGav> gavs = new GavResolver().resolve(buildFile, properties);
+            Set<File> reachableBuildFiles = new LinkedHashSet<>();
+            for (RawBuildFilePeek peek : scan.getPeeks()) {
+                reachableBuildFiles.add(peek.getBuildFile());
+            }
+            List<ResolvedGav> gavs = new GavResolver().resolve(buildFile, properties, reachableBuildFiles);
 
             // Step 3: correlate findings by groupId:artifactId so per-artifact conflicts are explicit.
             GavCorrelator.Result correlated = new GavCorrelator().correlate(gavs);

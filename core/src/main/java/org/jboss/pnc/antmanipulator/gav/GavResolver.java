@@ -146,15 +146,41 @@ public class GavResolver {
 
     /**
      * Resolve all coordinates discoverable from the project rooted at {@code rootBuildFile}, seeded
-     * with any user-supplied {@code -Dalignment.*} overrides.
+     * with any user-supplied {@code -Dalignment.*} overrides. Equivalent to
+     * {@link #resolve(File, Properties, Set)} with no known build-file hierarchy, so no nested
+     * directory is excluded.
      *
      * @return every finding, sorted most-trustworthy first
      */
     public List<ResolvedGav> resolve(File rootBuildFile, Properties overrides) throws IOException {
+        return resolve(rootBuildFile, overrides, null);
+    }
+
+    /**
+     * Resolve all coordinates discoverable from the project rooted at {@code rootBuildFile}, seeded
+     * with any user-supplied {@code -Dalignment.*} overrides.
+     *
+     * @param reachableBuildFiles the build files actually reachable from {@code rootBuildFile} by
+     *        following {@code <import>}/{@code <include>}/{@code <ant>}/{@code <subant>} references
+     *        (e.g. from {@code BuildFileScanner.ScanResult.getPeeks()}), or {@code null} if that
+     *        hierarchy wasn't crawled. When given, any subdirectory that has its own {@code build.xml}
+     *        NOT in this set is excluded entirely from coordinate discovery: such a directory is a
+     *        self-contained Ant project Ant itself never executes from this root (e.g. an abandoned
+     *        sandbox proposal bundled alongside the real sources, GitHub issue #44), so its
+     *        {@code pom.xml}/{@code project.xml}/etc. are not genuine candidates for this build's
+     *        publishing coordinates or execution root.
+     * @return every finding, sorted most-trustworthy first
+     */
+    public List<ResolvedGav> resolve(File rootBuildFile, Properties overrides, Set<File> reachableBuildFiles)
+            throws IOException {
         final File root = rootBuildFile.getCanonicalFile();
         final File rootDir = root.getParentFile();
 
-        final Context ctx = buildContext(root, rootDir, overrides == null ? new Properties() : overrides);
+        final Context ctx = buildContext(
+                root,
+                rootDir,
+                overrides == null ? new Properties() : overrides,
+                reachableBuildFiles);
 
         final List<ResolvedGav> all = new ArrayList<>();
         for (GavSource source : sources) {
@@ -172,7 +198,8 @@ public class GavResolver {
         return all;
     }
 
-    private Context buildContext(File root, File rootDir, Properties overrides) throws IOException {
+    private Context buildContext(File root, File rootDir, Properties overrides, Set<File> reachableBuildFiles)
+            throws IOException {
         final List<File> pomTemplates = new ArrayList<>();
         final List<File> maven1Poms = new ArrayList<>();
         final List<File> ivyFiles = new ArrayList<>();
@@ -180,9 +207,12 @@ public class GavResolver {
         final List<File> manifestFiles = new ArrayList<>();
         final List<File> versionTxtFiles = new ArrayList<>();
 
+        final Set<Path> excludedDirs = findUnreferencedBuildDirs(rootDir.toPath(), reachableBuildFiles);
+
         try (Stream<Path> walk = Files.walk(rootDir.toPath())) {
             walk.filter(Files::isRegularFile)
                     .filter(p -> !isUnderIgnoredDir(rootDir.toPath(), p))
+                    .filter(p -> !isUnderExcludedDir(excludedDirs, p))
                     .forEach(p -> {
                         final String name = p.getFileName().toString().toLowerCase(Locale.ROOT);
                         final File f = p.toFile();
@@ -224,6 +254,53 @@ public class GavResolver {
     private static boolean isUnderIgnoredDir(Path root, Path file) {
         for (Path part : root.relativize(file)) {
             if (IGNORED_DIRS.contains(part.toString())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Directories (other than {@code rootDir} itself) that have their own {@code build.xml} which is
+     * not in {@code reachableBuildFiles}: a self-contained Ant project Ant never actually executes from
+     * the given root, so it's excluded wholesale rather than merely deprioritised. Returns an empty set
+     * (nothing excluded) when {@code reachableBuildFiles} is {@code null} (hierarchy not crawled).
+     */
+    private static Set<Path> findUnreferencedBuildDirs(Path rootDir, Set<File> reachableBuildFiles)
+            throws IOException {
+        if (reachableBuildFiles == null) {
+            return Collections.emptySet();
+        }
+        final Set<Path> reachable = new LinkedHashSet<>();
+        for (File f : reachableBuildFiles) {
+            reachable.add(f.getCanonicalFile().toPath());
+        }
+
+        final Set<Path> excluded = new LinkedHashSet<>();
+        try (Stream<Path> walk = Files.walk(rootDir)) {
+            walk.filter(Files::isDirectory)
+                    .filter(d -> !d.equals(rootDir))
+                    .filter(d -> !isUnderIgnoredDir(rootDir, d))
+                    .forEach(d -> {
+                        Path buildXml = d.resolve("build.xml");
+                        if (Files.isRegularFile(buildXml)) {
+                            try {
+                                if (!reachable.contains(buildXml.toRealPath())) {
+                                    excluded.add(d);
+                                }
+                            } catch (IOException e) {
+                                logger.warn("Could not canonicalise {}: {}", buildXml, e.getMessage());
+                            }
+                        }
+                    });
+        }
+        return excluded;
+    }
+
+    /** True when {@code file} sits anywhere under one of {@code excludedDirs}. */
+    private static boolean isUnderExcludedDir(Set<Path> excludedDirs, Path file) {
+        for (Path dir = file.getParent(); dir != null; dir = dir.getParent()) {
+            if (excludedDirs.contains(dir)) {
                 return true;
             }
         }
