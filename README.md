@@ -23,7 +23,10 @@ The stages mirror PME's `ManipulationManager` flow:
 1. **Hierarchy crawl** — BFS over `<import>` / `<include>` / `<ant>` / `<subant>` links to find every
    build file that may need manipulating.
 2. **GAV resolution** — multi-GAV-with-provenance resolution from pom templates, `ivy.xml`,
-   Maven-1 `project.xml`, properties, and `-D` overrides.
+   Maven-1 `project.xml`, properties, and `-D` overrides. A subdirectory that has its own `build.xml`
+   is only considered when step 1's crawl actually reached it — a self-contained Ant project bundled
+   alongside the real sources but never executed from the root (e.g. an abandoned sandbox proposal) is
+   excluded, rather than being mistaken for a real artifact or the execution root.
 3. **Correlation** — group findings by `groupId:artifactId`, flag version conflicts.
 4. **Reconciliation** — resolve tokenised versions (`${...}`, `@TOKEN@`) to concrete values by
    following Ant's substitution chains.
