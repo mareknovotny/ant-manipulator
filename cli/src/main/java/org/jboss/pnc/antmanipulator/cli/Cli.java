@@ -539,10 +539,15 @@ public class Cli implements Callable<Integer> {
         return v == null ? null : Boolean.valueOf(v.trim());
     }
 
-    /** The property parsed as a boolean, or {@code fallback} when unset/blank. */
+    /**
+     * The property parsed as a boolean, or {@code fallback} only when the key is absent. Mirrors PME's
+     * {@code Boolean.parseBoolean(userProperties.getProperty(key, String.valueOf(fallback)))}: a present-but-empty
+     * value (e.g. {@code -DversionModification=}) is {@code ""}, which {@link Boolean#parseBoolean} treats as
+     * {@code false} rather than falling back. Keeping this verbatim is what lets the same argument string stay
+     * portable across PME/GME/AME.
+     */
     private boolean boolProp(String key, boolean fallback) {
-        String v = properties.getProperty(key);
-        return (v == null || v.trim().isEmpty()) ? fallback : Boolean.parseBoolean(v.trim());
+        return Boolean.parseBoolean(properties.getProperty(key, String.valueOf(fallback)));
     }
 
     /** The property parsed as an int, or {@code null} when unset. */

@@ -157,7 +157,41 @@ class Junit4AntProjectIT {
         String report = readFile(projectDir.resolve("alignmentReport.json").toFile());
         assertThat(report)
                 .contains("\"executionRoot\"")
-                .contains("junit:junit:4.8")
+                .contains("\"junit:junit:4.8\"")
+                .contains("\"version\" : \"4.8\"")
+                .doesNotContain("not-used");
+    }
+
+    @Test
+    void versionModificationPresentButEmptyIsTreatedAsFalseLikePme() throws IOException {
+        String before = readFile(buildFile);
+        daServer = stubFirstBuildDaServer();
+
+        // A present-but-empty -DversionModification= must behave exactly like =false, matching PME's
+        // Boolean.parseBoolean(getProperty("versionModification", "true")): the empty value parses to false,
+        // so the declared version is left untouched and the sentinel suffix never applies. A templated
+        // PNC/Repour invocation that substitutes an empty value here must not silently re-enable alignment.
+        int exitCode = new Cli().run(
+                new String[] {
+                        "-f",
+                        buildFile.getAbsolutePath(),
+                        "-Dalignment.groupId=junit",
+                        "-Dalignment.artifactId=junit",
+                        "-DrestURL=" + daBaseUrl(),
+                        "-DversionIncrementalSuffix=not-used",
+                        "-DversionModification=",
+                        "-DreportJsonUnchanged=true" });
+
+        assertThat(exitCode).isEqualTo(0);
+
+        // The build file is left exactly as-is.
+        assertThat(readFile(buildFile)).isEqualTo(before);
+
+        String report = readFile(projectDir.resolve("alignmentReport.json").toFile());
+        assertThat(report)
+                .contains("\"executionRoot\"")
+                .contains("\"junit:junit:4.8\"")
+                .contains("\"version\" : \"4.8\"")
                 .doesNotContain("not-used");
     }
 
