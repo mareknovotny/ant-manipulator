@@ -72,6 +72,11 @@ many artifacts. `executionRoot` is chosen as whichever realigned artifact has a 
 directly from the root build file (the one passed to `-f`); if none is declared there, the first
 realigned artifact (by `groupId:artifactId` order) is used instead.
 
+When [`versionModification=false`](version-manip.html#disabling-version-modification) nothing is
+realigned, so `modules` is empty — but `executionRoot` is still populated, chosen the same way from
+the discovered artifacts and reported at its **unchanged** declared version (`originalGAV` equals
+`version`). This lets PNC/Repour record and tag the build even when no version was modified.
+
 ### Annotated example
 
 ```json

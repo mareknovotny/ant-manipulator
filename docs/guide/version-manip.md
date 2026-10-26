@@ -22,6 +22,35 @@ used by PME and GME:
 The suffix and serial are assigned by the DA service in response to the coordinate lookup; the tool
 does not choose a serial unilaterally.
 
+## Disabling Version Modification
+
+`versionModification` is the master switch for the whole process described on this page. It mirrors
+PME's property of the same name.
+
+| Property | Description | Default |
+| --- | --- | --- |
+| `versionModification` | Whether to modify the project version at all | `true` |
+
+When set to `false`, ant-manipulator leaves the project's own version **completely untouched**: it
+skips the DA lookup, skips computing any rebuild suffix, and skips the rewrite step entirely. The
+build files are left byte-for-byte as they were, and the build publishes under its **declared**
+(upstream) version:
+
+```bash
+-DversionModification=false
+# 1.2.3  →  1.2.3   (no lookup, no suffix, no rewrite)
+```
+
+PNC sets `versionModification=false` for build categories meant to publish
+under the upstream version, pairing it with a sentinel `versionIncrementalSuffix` that must never be
+applied. Because PME honors the flag and short-circuits before touching the version, ant-manipulator
+must too — otherwise that sentinel suffix would be used as a versioning part in the published artifacts.
+
+Even with modification disabled, the [PME alignment report](report.html#pme-alignment-report) still
+records the execution root's coordinate (at its unchanged version, so `originalGAV` equals the new
+version) so PNC/Repour can record and tag the build. The report has no `modules` entries, since
+nothing was realigned; combine with `-DreportJsonUnchanged=true` to force it to be written.
+
 ## Automatic Version Increment
 
 The rebuild suffix is controlled by the `versionIncrementalSuffix` property.

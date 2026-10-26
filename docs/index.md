@@ -70,6 +70,7 @@ REST/DA and version keys match PME/GME verbatim; `restURL` enables alignment whe
 | `restHeaders` | Request headers as comma-separated `name:value` pairs (auth token goes here) | — |
 | `restBrewPullActive` | Enable DA brew-pull for the lookup | `false` |
 | `restSocketTimeout` | Lookup read/socket timeout in seconds | Unirest default (~10 s) |
+| `versionModification` | When `false`, leave the project version untouched: skip the DA lookup, suffix and rewrite, and publish under the declared version. Matches PME. | `true` |
 | `versionIncrementalSuffix` | Rebuild suffix inserted before the serial (`1.2.3.<suffix>-00001`) | `redhat` |
 | `versionIncrementalSuffixPadding` | Zero-padding width of the rebuild serial | `5` |
 | `versionSuffixStrip` | Dev markers stripped like `-SNAPSHOT` before the suffix is applied (comma-separated). Opt-in; no PME equivalent. | _(none)_ |
