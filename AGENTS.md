@@ -78,6 +78,11 @@ See `CONTRIBUTING.md` for the full list; the ones most load-bearing for agents:
   (e.g. `restURL`, `restMode`, `restHeaders`, `versionIncrementalSuffix`) — this is what lets the same
   argument string be portable across PME, GME, and this tool. Don't rename or diverge from PME's key
   names without a strong reason.
+- **Versioning is opt-in; there is no default suffix** — like PME's `VersioningState.isEnabled()`, the
+  project version is only modified when `versionModification` is not `false` *and* a versioning option is
+  configured (`Cli.isVersioningRequested()`; today just `versionIncrementalSuffix`, later also
+  `versionOverride`). Never reintroduce a fallback suffix such as `redhat`. The one deliberate deviation:
+  an empty `-DversionIncrementalSuffix=` fails fast (exit 10) instead of PME's bare-counter form.
 
 ## Submitting changes
 

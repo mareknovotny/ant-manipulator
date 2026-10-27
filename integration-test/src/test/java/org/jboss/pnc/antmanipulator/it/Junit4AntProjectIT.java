@@ -88,6 +88,7 @@ class Junit4AntProjectIT {
                         "-Dalignment.groupId=junit",
                         "-Dalignment.artifactId=junit",
                         "-DrestURL=" + daBaseUrl(),
+                        "-DversionIncrementalSuffix=redhat",
                         "--preview" });
 
         assertThat(exitCode).isEqualTo(0);
@@ -104,7 +105,8 @@ class Junit4AntProjectIT {
                         buildFile.getAbsolutePath(),
                         "-Dalignment.groupId=junit",
                         "-Dalignment.artifactId=junit",
-                        "-DrestURL=" + daBaseUrl() });
+                        "-DrestURL=" + daBaseUrl(),
+                        "-DversionIncrementalSuffix=redhat" });
 
         assertThat(exitCode).isEqualTo(0);
 
@@ -205,6 +207,77 @@ class Junit4AntProjectIT {
                 .contains("\"junit:junit:4.8\"")
                 .contains("\"version\" : \"4.8\"")
                 .doesNotContain("not-used");
+    }
+
+    @Test
+    void noVersioningOptionLeavesTheDeclaredVersionUntouchedLikePme() throws IOException {
+        String before = readFile(buildFile);
+        daServer = stubFirstBuildDaServer();
+
+        // Versioning is opt-in, as in PME's VersioningState.isEnabled(): with restURL set but no
+        // versionIncrementalSuffix there is no default suffix, so nothing is looked up or rewritten.
+        int exitCode = new Cli().run(
+                new String[] {
+                        "-f",
+                        buildFile.getAbsolutePath(),
+                        "-Dalignment.groupId=junit",
+                        "-Dalignment.artifactId=junit",
+                        "-DrestURL=" + daBaseUrl(),
+                        "-DreportJsonUnchanged=true" });
+
+        assertThat(exitCode).isEqualTo(0);
+        daServer.verify(0, postRequestedFor(urlEqualTo("/lookup/maven/latest")));
+        assertThat(readFile(buildFile)).isEqualTo(before);
+
+        String report = readFile(projectDir.resolve("alignmentReport.json").toFile());
+        assertThat(report)
+                .contains("\"executionRoot\"")
+                .contains("\"junit:junit:4.8\"")
+                .contains("\"version\" : \"4.8\"")
+                .doesNotContain("redhat");
+    }
+
+    @Test
+    void emptyVersionIncrementalSuffixFailsFast() throws IOException {
+        String before = readFile(buildFile);
+        daServer = stubFirstBuildDaServer();
+
+        // PME accepts an empty suffix (a bare counter), but VersionIncrementer cannot produce that form,
+        // so an empty value is rejected up front rather than emitting malformed versions.
+        int exitCode = new Cli().run(
+                new String[] {
+                        "-f",
+                        buildFile.getAbsolutePath(),
+                        "-Dalignment.groupId=junit",
+                        "-Dalignment.artifactId=junit",
+                        "-DrestURL=" + daBaseUrl(),
+                        "-DversionIncrementalSuffix=" });
+
+        assertThat(exitCode).isEqualTo(10);
+        daServer.verify(0, postRequestedFor(urlEqualTo("/lookup/maven/latest")));
+        assertThat(readFile(buildFile)).isEqualTo(before);
+        assertThat(projectDir.resolve("alignmentReport.json")).doesNotExist();
+    }
+
+    @Test
+    void emptyVersionIncrementalSuffixIsIgnoredWhenVersionModificationIsFalse() throws IOException {
+        String before = readFile(buildFile);
+        daServer = stubFirstBuildDaServer();
+
+        int exitCode = new Cli().run(
+                new String[] {
+                        "-f",
+                        buildFile.getAbsolutePath(),
+                        "-Dalignment.groupId=junit",
+                        "-Dalignment.artifactId=junit",
+                        "-DrestURL=" + daBaseUrl(),
+                        "-DversionIncrementalSuffix=",
+                        "-DversionModification=false",
+                        "-DreportJsonUnchanged=true" });
+
+        assertThat(exitCode).isEqualTo(0);
+        daServer.verify(0, postRequestedFor(urlEqualTo("/lookup/maven/latest")));
+        assertThat(readFile(buildFile)).isEqualTo(before);
     }
 
     private WireMockServer stubFirstBuildDaServer() {

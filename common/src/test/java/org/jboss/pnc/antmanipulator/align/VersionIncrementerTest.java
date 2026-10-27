@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
  */
 class VersionIncrementerTest {
 
-    private final VersionIncrementer incrementer = VersionIncrementer.defaults();
+    private final VersionIncrementer incrementer = new VersionIncrementer("redhat", VersionIncrementer.DEFAULT_PADDING);
 
     @Nested
     class FirstBuild {

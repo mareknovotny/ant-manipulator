@@ -13,7 +13,7 @@ ant-manipulator emits two JSON reports, each with a different job:
 
 | Report | Property | Default path | When written |
 | --- | --- | --- | --- |
-| [PME alignment report](#pme-alignment-report) | `reportJSONOutputFile` | `alignmentReport.json` beside the build file | After alignment, only if something was realigned (or `reportJsonUnchanged=true`) |
+| [PME alignment report](#pme-alignment-report) | `reportJSONOutputFile` | `alignmentReport.json` beside the build file | After alignment, only if something was realigned (or `reportJsonUnchanged=true`). With no versioning option or `versionModification=false` nothing is realigned, so it is only written with `reportJsonUnchanged=true` |
 | [Discovery report](#discovery-report) | `discoveryReportJSONOutputFile` | `discovery-report.json` beside the build file | Always, including when `restURL` is not set (discovery/report-only mode) |
 
 The **PME alignment report** is what PNC/Repour consume: it reuses PME's own JSON POJOs

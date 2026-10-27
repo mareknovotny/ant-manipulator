@@ -83,6 +83,7 @@ class GroovyScriptIT {
                         "-f",
                         buildFile.getAbsolutePath(),
                         "-DrestURL=http://localhost:" + daServer.port(),
+                        "-DversionIncrementalSuffix=redhat",
                         "-DgroovyScripts=" + first + "," + last });
 
         assertThat(exitCode).isEqualTo(0);

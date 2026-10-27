@@ -109,6 +109,7 @@ class JacksonAntProjectIT {
                         "-f",
                         buildFile.getAbsolutePath(),
                         "-DrestURL=" + daBaseUrl(),
+                        "-DversionIncrementalSuffix=redhat",
                         "--preview" });
 
         assertThat(exitCode).isEqualTo(0);
@@ -123,7 +124,8 @@ class JacksonAntProjectIT {
                 new String[] {
                         "-f",
                         buildFile.getAbsolutePath(),
-                        "-DrestURL=" + daBaseUrl() });
+                        "-DrestURL=" + daBaseUrl(),
+                        "-DversionIncrementalSuffix=redhat" });
 
         assertThat(exitCode).isEqualTo(0);
 

@@ -10,8 +10,10 @@ title: "DA REST Integration"
 ## Overview
 
 ant-manipulator can look up artifact coordinates against a **Dependency Analyzer (DA)** REST service
-to obtain the exact rebuild version each artifact should be published under. Alignment is opt-in: if
-`restURL` is not set, the tool runs in discovery/report-only mode and writes no changes.
+to obtain the exact rebuild version each artifact should be published under. Alignment is opt-in: it
+only happens when `restURL` is set **and** a versioning option such as `versionIncrementalSuffix` is
+configured (see [Version Manipulation](version-manip.html#automatic-version-increment)). Otherwise the
+tool runs in discovery/report-only mode and writes no changes.
 
 The DA REST layer is provided by PME's own
 `pom-manipulation-io` module (`DefaultTranslator`/`Translator`), so the wire protocol and lookup

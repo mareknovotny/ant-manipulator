@@ -21,7 +21,7 @@ where each property is described in detail.
 | `restMode` | DA lookup mode (`PERSISTENT`, `TEMPORARY`, …) | [rest-da.html#lookup-mode](rest-da.html#lookup-mode) |
 | `restSocketTimeout` | Lookup read/socket timeout in seconds | [rest-da.html#timeouts](rest-da.html#timeouts) |
 | `restURL` | DA lookup service base URL | [rest-da.html#configuring-the-endpoint](rest-da.html#configuring-the-endpoint) |
-| `versionIncrementalSuffix` | Rebuild suffix inserted before the serial | [version-manip.html#automatic-version-increment](version-manip.html#automatic-version-increment) |
-| `versionModification` | Disable all version modification (skip DA lookup, suffix and rewrite) | [version-manip.html#disabling-version-modification](version-manip.html#disabling-version-modification) |
+| `versionIncrementalSuffix` | Rebuild suffix inserted before the serial (opt-in; no default) | [version-manip.html#automatic-version-increment](version-manip.html#automatic-version-increment) |
 | `versionIncrementalSuffixPadding` | Zero-padding width of the rebuild serial | [version-manip.html#version-increment-padding](version-manip.html#version-increment-padding) |
+| `versionModification` | Disable all version modification (skip DA lookup, suffix and rewrite) | [version-manip.html#disabling-version-modification](version-manip.html#disabling-version-modification) |
 | `versionSuffixStrip` | Dev markers stripped before the rebuild suffix is applied | [version-manip.html#suffix-stripping](version-manip.html#suffix-stripping) |

@@ -10,9 +10,10 @@ title: "Version Manipulation"
 ## Overview
 
 When a project is rebuilt in a cleanroom environment, each artifact must be published under a new
-version that identifies it as a rebuild. ant-manipulator computes this version by appending a
-**rebuild suffix** and a zero-padded serial number to the original version, matching the convention
-used by PME and GME:
+version that identifies it as a rebuild. When version modification is requested (see
+[Automatic Version Increment](#automatic-version-increment)), ant-manipulator computes this version by
+appending a **rebuild suffix** and a zero-padded serial number to the original version, matching the
+convention used by PME and GME:
 
 ```
 <original>.<suffix>-<serial>
@@ -57,17 +58,27 @@ The rebuild suffix is controlled by the `versionIncrementalSuffix` property.
 
 | Property | Description | Default |
 | --- | --- | --- |
-| `versionIncrementalSuffix` | Text inserted before the serial number | `redhat` |
+| `versionIncrementalSuffix` | Text inserted before the serial number | — (none) |
 
-Example:
+There is **no default suffix**. As in PME, versioning is opt-in: the suffix must be supplied explicitly,
+for example:
 
 ```bash
 -DversionIncrementalSuffix=redhat
 # 2.0.0  →  2.0.0.redhat-00001
 ```
 
-This matches the default used by PME and GME and should not normally need to change for Red Hat
-rebuilds.
+If `versionIncrementalSuffix` is not set, ant-manipulator behaves exactly as if
+[`versionModification=false`](#disabling-version-modification) had been given: it skips the DA lookup,
+the version computation and the rewrite, and leaves the build files untouched. With
+`-DreportJsonUnchanged=true` it also writes the
+[PME alignment report](report.html#pme-alignment-report) with the execution root at its unchanged
+version, exactly as for `versionModification=false`.
+
+An **empty** value (`-DversionIncrementalSuffix=`) is rejected with exit code `10` and an error message,
+before any file is read or modified. This deliberately differs from PME, which accepts an empty suffix and
+appends a bare build counter (for example `1.2.0` → `1.2.0.3`); ant-manipulator cannot produce or
+recognise that form. When `versionModification=false`, an empty suffix is ignored.
 
 ## Version Increment Padding
 

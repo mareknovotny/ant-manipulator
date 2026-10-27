@@ -38,8 +38,10 @@ import org.jboss.pnc.mavenmanipulator.common.exception.ManipulationException;
  */
 public final class VersionIncrementer {
 
-    /** DA's default rebuild suffix and zero-padding width (e.g. {@code redhat-00001}). */
-    public static final String DEFAULT_SUFFIX = "redhat";
+    /**
+     * Default zero-padding width of the rebuild serial (e.g. {@code 00001}), matching PME. There is deliberately
+     * no default suffix: as in PME, the suffix is opt-in and must always be supplied by the caller.
+     */
     public static final int DEFAULT_PADDING = 5;
 
     /**
@@ -105,10 +107,6 @@ public final class VersionIncrementer {
             return null;
         }
         return Pattern.compile("(?i)[.-](" + String.join("|", quoted) + ")$");
-    }
-
-    public static VersionIncrementer defaults() {
-        return new VersionIncrementer(DEFAULT_SUFFIX, DEFAULT_PADDING);
     }
 
     /** The outcome of computing a project's publish version. */

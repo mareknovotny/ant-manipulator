@@ -165,6 +165,21 @@ public class Cli implements Callable<Integer> {
             return 10;
         }
 
+        // Versioning is opt-in, as in PME's VersioningState.isEnabled(): the project version is only modified
+        // when versionModification is not false AND a versioning option is configured. There is no default suffix.
+        final boolean versionModification = boolProp(PROP_VERSION_MODIFICATION, true) && isVersioningRequested();
+        if (versionModification && isBlank(properties.getProperty(PROP_VERSION_INCREMENTAL_SUFFIX))) {
+            // PME accepts an empty suffix (a bare counter, e.g. 1.2.0 -> 1.2.0.3), but VersionIncrementer cannot
+            // produce or recognise that form, so fail fast rather than emit malformed versions or hide a likely
+            // mistake such as an empty templated value.
+            logger.error(
+                    "{} is set but empty; an empty suffix is not supported. Provide a value (e.g. -D{}=redhat) "
+                            + "or omit the property.",
+                    PROP_VERSION_INCREMENTAL_SUFFIX,
+                    PROP_VERSION_INCREMENTAL_SUFFIX);
+            return 10;
+        }
+
         // Groovy scripts (-DgroovyScripts=...), as in PME/GME: FIRST-stage scripts run before anything is read,
         // so they may edit build files on disk; LAST-stage scripts run after the versions are rewritten.
         final String restUrl = properties.getProperty(PROP_REST_URL);
@@ -284,18 +299,21 @@ public class Cli implements Callable<Integer> {
             // the project's OWN publishing coordinates, so aligning them means computing the version to
             // publish under — not swapping in an existing rebuild (that is dependency alignment). We ask DA's
             // lookup/maven/latest endpoint for the highest existing build, then increment its serial (or
-            // synthesise redhat-00001 for a first build). The external source of truth decides the base,
+            // synthesise <suffix>-00001 for a first build). The external source of truth decides the base,
             // exactly as PME delegates to the Dependency Analyzer.
             // Collect base version literal -> computed publish version, for the rewrite step.
-            // PME's versionModification (default true): when false, the project version is left untouched —
-            // skip the DA lookup, the increment and the rewrite entirely, so the build publishes under its
-            // declared version. (PME honours this; AME must too, else a sentinel suffix leaks onto artifacts.)
-            final boolean versionModification = boolProp(PROP_VERSION_MODIFICATION, true);
+            // When versionModification is false, or no versioning option is configured (see above), the project
+            // version is left untouched — skip the DA lookup, the increment and the rewrite entirely, so the build
+            // publishes under its declared version. (PME honours this; AME must too, else a sentinel suffix leaks
+            // onto artifacts.)
             Map<String, String> versionRewrites = new LinkedHashMap<>();
             if (!versionModification) {
                 logger.info(
-                        "versionModification=false: leaving the project version unchanged "
-                                + "(skipping DA lookup, version increment and rewrite).");
+                        "Version modification is disabled ({}=false, or no version modification option such as {} "
+                                + "is configured): leaving the project version unchanged "
+                                + "(skipping DA lookup, version increment and rewrite).",
+                        PROP_VERSION_MODIFICATION,
+                        PROP_VERSION_INCREMENTAL_SUFFIX);
             } else if (translator != null) {
                 List<ProjectVersionRef> coordinates = concreteCoordinates(gavs, reconciler);
                 if (coordinates.isEmpty()) {
@@ -310,7 +328,7 @@ public class Cli implements Callable<Integer> {
                         return 10;
                     }
                     VersionIncrementer incrementer = new VersionIncrementer(
-                            properties.getProperty(PROP_VERSION_INCREMENTAL_SUFFIX, VersionIncrementer.DEFAULT_SUFFIX),
+                            properties.getProperty(PROP_VERSION_INCREMENTAL_SUFFIX),
                             intProp(PROP_VERSION_INCREMENTAL_SUFFIX_PADDING, VersionIncrementer.DEFAULT_PADDING),
                             false,
                             properties.getProperty(PROP_VERSION_SUFFIX_STRIP, VersionIncrementer.DEFAULT_DEV_MARKERS));
@@ -506,6 +524,15 @@ public class Cli implements Callable<Integer> {
 
     private static boolean isBlank(String s) {
         return s == null || s.trim().isEmpty();
+    }
+
+    /**
+     * The analogue of the option check in PME's {@code VersioningState.isEnabled()}: whether any option that asks
+     * for the project version to be modified is configured. Today that is only {@code versionIncrementalSuffix}
+     * (there is deliberately no default); further options such as {@code versionOverride} belong here.
+     */
+    private boolean isVersioningRequested() {
+        return properties.getProperty(PROP_VERSION_INCREMENTAL_SUFFIX) != null;
     }
 
     /**
