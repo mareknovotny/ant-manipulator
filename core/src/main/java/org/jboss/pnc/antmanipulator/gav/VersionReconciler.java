@@ -119,9 +119,25 @@ public final class VersionReconciler {
      * targets that {@code <echo>} a generated properties file), which no static scan can otherwise know.
      */
     public static VersionReconciler forTree(File rootDir, File rootBuildFile, Properties overrides) {
+        return forTree(rootDir, rootBuildFile, overrides, null);
+    }
+
+    /**
+     * As {@link #forTree(File, File, Properties)}, but excludes any subdirectory that has its own
+     * {@code build.xml} not in {@code reachableBuildFiles} (GitHub issue #44) from the tree scan — the
+     * same directories {@link GavResolver} excludes from coordinate discovery, so a directory that isn't
+     * really part of this build can't inject a {@code <filter>}/{@code <property>} definition into
+     * reconciling another coordinate's version either. Pass {@code null} (the other overloads' default)
+     * to keep scanning the whole tree, e.g. when the build-file hierarchy wasn't crawled.
+     */
+    public static VersionReconciler forTree(
+            File rootDir,
+            File rootBuildFile,
+            Properties overrides,
+            Set<File> reachableBuildFiles) {
         Map<String, Set<String>> tokens = new LinkedHashMap<>();
         Map<String, Set<String>> params = new LinkedHashMap<>();
-        collectDefinitions(rootDir, tokens, params);
+        collectDefinitions(rootDir, tokens, params, reachableBuildFiles);
         Map<String, String> ov = new LinkedHashMap<>();
         if (overrides != null) {
             for (String name : overrides.stringPropertyNames()) {
@@ -304,17 +320,25 @@ public final class VersionReconciler {
      * Walk the tree once and gather both substitution sources: every {@code <filter token=.. value=..>}
      * (into {@code tokens}) and every {@code <param name=.. value=..>}/{@code <property name=.. value=..>}
      * (into {@code params}). Definitions routinely live in build files reached only via {@code <subant>}
-     * or invoked standalone, so we scan the tree rather than the import graph.
+     * or invoked standalone, so we scan the tree rather than the import graph — except a subdirectory
+     * that has its own {@code build.xml} entirely absent from {@code reachableBuildFiles} (not merely
+     * reached via an unresolvable {@code ${...}} path), which is excluded the same way
+     * {@link GavResolver} excludes it from coordinate discovery.
      */
     private static void collectDefinitions(
             File rootDir,
             Map<String, Set<String>> tokens,
-            Map<String, Set<String>> params) {
-        try (Stream<Path> walk = Files.walk(rootDir.toPath())) {
-            walk.filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".xml"))
-                    .filter(p -> !isUnderIgnoredDir(rootDir.toPath(), p))
-                    .forEach(p -> collectFrom(p.toFile(), tokens, params));
+            Map<String, Set<String>> params,
+            Set<File> reachableBuildFiles) {
+        try {
+            final Set<Path> excludedDirs = UnreferencedBuildDirs.find(rootDir.toPath(), reachableBuildFiles);
+            try (Stream<Path> walk = Files.walk(rootDir.toPath())) {
+                walk.filter(Files::isRegularFile)
+                        .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".xml"))
+                        .filter(p -> !isUnderIgnoredDir(rootDir.toPath(), p))
+                        .filter(p -> !UnreferencedBuildDirs.isUnder(excludedDirs, p))
+                        .forEach(p -> collectFrom(p.toFile(), tokens, params));
+            }
         } catch (Exception e) {
             logger.debug("Failed walking {} for definitions: {}", rootDir, e.getMessage());
         }

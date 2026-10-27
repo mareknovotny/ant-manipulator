@@ -124,6 +124,15 @@ public final class VersionRewriter {
     }
 
     /**
+     * As {@link #plan(File, Map, VersionReconciler, Set)}, scanning the whole tree (nothing excluded).
+     *
+     * @return the planned edits, in file/line order (empty if no definition sites were found)
+     */
+    public static List<Edit> plan(File rootDir, Map<String, String> versionMap, VersionReconciler reconciler) {
+        return plan(rootDir, versionMap, reconciler, null);
+    }
+
+    /**
      * Plan (but do not apply) every version rewrite implied by {@code versionMap} across the tree rooted
      * at {@code rootDir}. {@code versionMap} maps a resolved base version (e.g. {@code 3.8-beta1} or
      * {@code 12.0.0-M1}) to the version it should become (e.g. {@code 3.8-beta1-redhat-00001}).
@@ -137,18 +146,33 @@ public final class VersionRewriter {
      * Maven model's {@code <version>}. Expression matching is skipped when {@code reconciler} is null or
      * the expression resolves ambiguously (to more than one target).
      *
+     * <p>
+     * A subdirectory that has its own {@code build.xml} not in {@code reachableBuildFiles} (GitHub issue
+     * #44) is never rewritten, even if a version-defining site inside it happens to literally match a
+     * {@code versionMap} key: that directory isn't part of this build, so its definitions must be left
+     * alone exactly like {@link GavResolver} leaves its coordinates out of discovery. Pass {@code null}
+     * to scan the whole tree, e.g. when the build-file hierarchy wasn't crawled.
+     *
      * @return the planned edits, in file/line order (empty if no definition sites were found)
      */
-    public static List<Edit> plan(File rootDir, Map<String, String> versionMap, VersionReconciler reconciler) {
+    public static List<Edit> plan(
+            File rootDir,
+            Map<String, String> versionMap,
+            VersionReconciler reconciler,
+            Set<File> reachableBuildFiles) {
         final List<Edit> edits = new ArrayList<>();
         if (versionMap == null || versionMap.isEmpty()) {
             return edits;
         }
-        try (Stream<Path> walk = Files.walk(rootDir.toPath())) {
-            walk.filter(Files::isRegularFile)
-                    .filter(p -> !isUnderIgnoredDir(rootDir.toPath(), p))
-                    .filter(VersionRewriter::isCandidate)
-                    .forEach(p -> planFile(p.toFile(), versionMap, reconciler, edits));
+        try {
+            final Set<Path> excludedDirs = UnreferencedBuildDirs.find(rootDir.toPath(), reachableBuildFiles);
+            try (Stream<Path> walk = Files.walk(rootDir.toPath())) {
+                walk.filter(Files::isRegularFile)
+                        .filter(p -> !isUnderIgnoredDir(rootDir.toPath(), p))
+                        .filter(p -> !UnreferencedBuildDirs.isUnder(excludedDirs, p))
+                        .filter(VersionRewriter::isCandidate)
+                        .forEach(p -> planFile(p.toFile(), versionMap, reconciler, edits));
+            }
         } catch (Exception e) {
             logger.debug("Failed walking {} for rewrites: {}", rootDir, e.getMessage());
         }

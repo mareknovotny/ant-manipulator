@@ -9,8 +9,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.jboss.pnc.antmanipulator.gav.VersionRewriter.Edit;
 import org.junit.jupiter.api.Test;
@@ -233,5 +235,73 @@ class VersionRewriterTest {
         assertThat(changed).isEmpty();
         assertThat(read(build)).contains("value=\"9.9.9\""); // untouched
         assertThat(new File(dir.toFile(), "build.xml.bak")).doesNotExist();
+    }
+
+    // ---- unreferenced nested build.xml exclusion (GitHub issue #44) ----
+
+    @Test
+    void siteInUnreferencedNestedBuildDirIsNeverRewritten(@TempDir Path dir) throws IOException {
+        // A coincidental literal match inside a self-contained Ant project Ant never executes from the
+        // root (e.g. an abandoned sandbox proposal bundled alongside the real sources) must not be
+        // touched, even though its value happens to equal an aligned base version elsewhere in the tree.
+        File build = write(
+                dir,
+                "build.xml",
+                "<project><property name=\"version.id\" value=\"3.8-beta1\"/></project>");
+        Files.createDirectories(dir.resolve("proposal/ftp2"));
+        write(dir.resolve("proposal/ftp2"), "build.xml", "<project name=\"ftp2\"/>");
+        write(
+                dir.resolve("proposal/ftp2"),
+                "project.xml",
+                "<project><currentVersion>3.8-beta1</currentVersion></project>");
+        Set<File> reachable = Collections.singleton(build.getCanonicalFile()); // only the root was crawled
+
+        List<Edit> edits = VersionRewriter
+                .plan(dir.toFile(), map("3.8-beta1", "3.8-beta1-redhat-00001"), null, reachable);
+
+        assertThat(edits).extracting(Edit::getFile).containsExactly(build);
+    }
+
+    @Test
+    void siteInReferencedNestedBuildDirIsStillRewritten(@TempDir Path dir) throws IOException {
+        File build = write(
+                dir,
+                "build.xml",
+                "<project><property name=\"version.id\" value=\"3.8-beta1\"/></project>");
+        Files.createDirectories(dir.resolve("sub"));
+        File subBuild = write(dir.resolve("sub"), "build.xml", "<project name=\"sub\"/>");
+        write(
+                dir.resolve("sub"),
+                "project.xml",
+                "<project><currentVersion>3.8-beta1</currentVersion></project>");
+        Set<File> reachable = new LinkedHashSet<>();
+        reachable.add(build.getCanonicalFile());
+        reachable.add(subBuild.getCanonicalFile());
+
+        List<Edit> edits = VersionRewriter
+                .plan(dir.toFile(), map("3.8-beta1", "3.8-beta1-redhat-00001"), null, reachable);
+
+        assertThat(edits).extracting(Edit::getFile)
+                .containsExactlyInAnyOrder(build, dir.resolve("sub/project.xml").toFile());
+    }
+
+    @Test
+    void nullReachableSetStillRewritesUnreferencedNestedBuildDir(@TempDir Path dir) throws IOException {
+        // The 2-/3-arg overloads (hierarchy not crawled) must keep today's behaviour: rewrite everywhere.
+        File build = write(
+                dir,
+                "build.xml",
+                "<project><property name=\"version.id\" value=\"3.8-beta1\"/></project>");
+        Files.createDirectories(dir.resolve("proposal/ftp2"));
+        write(dir.resolve("proposal/ftp2"), "build.xml", "<project name=\"ftp2\"/>");
+        write(
+                dir.resolve("proposal/ftp2"),
+                "project.xml",
+                "<project><currentVersion>3.8-beta1</currentVersion></project>");
+
+        List<Edit> edits = VersionRewriter.plan(dir.toFile(), map("3.8-beta1", "3.8-beta1-redhat-00001"));
+
+        assertThat(edits).extracting(Edit::getFile)
+                .containsExactlyInAnyOrder(build, dir.resolve("proposal/ftp2/project.xml").toFile());
     }
 }

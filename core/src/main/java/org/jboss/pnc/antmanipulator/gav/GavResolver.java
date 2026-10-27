@@ -207,12 +207,12 @@ public class GavResolver {
         final List<File> manifestFiles = new ArrayList<>();
         final List<File> versionTxtFiles = new ArrayList<>();
 
-        final Set<Path> excludedDirs = findUnreferencedBuildDirs(rootDir.toPath(), reachableBuildFiles);
+        final Set<Path> excludedDirs = UnreferencedBuildDirs.find(rootDir.toPath(), reachableBuildFiles);
 
         try (Stream<Path> walk = Files.walk(rootDir.toPath())) {
             walk.filter(Files::isRegularFile)
                     .filter(p -> !isUnderIgnoredDir(rootDir.toPath(), p))
-                    .filter(p -> !isUnderExcludedDir(excludedDirs, p))
+                    .filter(p -> !UnreferencedBuildDirs.isUnder(excludedDirs, p))
                     .forEach(p -> {
                         final String name = p.getFileName().toString().toLowerCase(Locale.ROOT);
                         final File f = p.toFile();
@@ -254,53 +254,6 @@ public class GavResolver {
     private static boolean isUnderIgnoredDir(Path root, Path file) {
         for (Path part : root.relativize(file)) {
             if (IGNORED_DIRS.contains(part.toString())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Directories (other than {@code rootDir} itself) that have their own {@code build.xml} which is
-     * not in {@code reachableBuildFiles}: a self-contained Ant project Ant never actually executes from
-     * the given root, so it's excluded wholesale rather than merely deprioritised. Returns an empty set
-     * (nothing excluded) when {@code reachableBuildFiles} is {@code null} (hierarchy not crawled).
-     */
-    private static Set<Path> findUnreferencedBuildDirs(Path rootDir, Set<File> reachableBuildFiles)
-            throws IOException {
-        if (reachableBuildFiles == null) {
-            return Collections.emptySet();
-        }
-        final Set<Path> reachable = new LinkedHashSet<>();
-        for (File f : reachableBuildFiles) {
-            reachable.add(f.getCanonicalFile().toPath());
-        }
-
-        final Set<Path> excluded = new LinkedHashSet<>();
-        try (Stream<Path> walk = Files.walk(rootDir)) {
-            walk.filter(Files::isDirectory)
-                    .filter(d -> !d.equals(rootDir))
-                    .filter(d -> !isUnderIgnoredDir(rootDir, d))
-                    .forEach(d -> {
-                        Path buildXml = d.resolve("build.xml");
-                        if (Files.isRegularFile(buildXml)) {
-                            try {
-                                if (!reachable.contains(buildXml.toRealPath())) {
-                                    excluded.add(d);
-                                }
-                            } catch (IOException e) {
-                                logger.warn("Could not canonicalise {}: {}", buildXml, e.getMessage());
-                            }
-                        }
-                    });
-        }
-        return excluded;
-    }
-
-    /** True when {@code file} sits anywhere under one of {@code excludedDirs}. */
-    private static boolean isUnderExcludedDir(Set<Path> excludedDirs, Path file) {
-        for (Path dir = file.getParent(); dir != null; dir = dir.getParent()) {
-            if (excludedDirs.contains(dir)) {
                 return true;
             }
         }

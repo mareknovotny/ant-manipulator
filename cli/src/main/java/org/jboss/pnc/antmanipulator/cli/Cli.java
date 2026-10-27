@@ -268,7 +268,7 @@ public class Cli implements Callable<Integer> {
             // Step 4: reconcile tokenised versions to concrete values by following
             // @TOKEN@ -> <filter> -> ${property} chains (the state Maven's model gives PME for free).
             VersionReconciler reconciler = VersionReconciler
-                    .forTree(buildFile.getParentFile(), buildFile, properties);
+                    .forTree(buildFile.getParentFile(), buildFile, properties, reachableBuildFiles);
 
             Set<String> tokenised = new LinkedHashSet<>();
             for (ResolvedGav g : gavs) {
@@ -387,7 +387,7 @@ public class Cli implements Callable<Integer> {
 
                     // Step 7 (PME's PomIO.rewritePOMs analogue): apply the computed publish versions back to
                     // the build files at their definition sites. Applies in place by default; --preview skips.
-                    rewriteVersions(buildFile.getParentFile(), versionRewrites, reconciler);
+                    rewriteVersions(buildFile.getParentFile(), versionRewrites, reconciler, reachableBuildFiles);
                 }
             }
 
@@ -506,12 +506,16 @@ public class Cli implements Callable<Integer> {
      * (or, with {@code --preview}, just report them). Reports every planned edit so the user can verify that only
      * version-defining positions — not prose or unrelated properties — are being touched.
      */
-    private void rewriteVersions(File rootDir, Map<String, String> versionRewrites, VersionReconciler reconciler)
-            throws java.io.IOException {
+    private void rewriteVersions(
+            File rootDir,
+            Map<String, String> versionRewrites,
+            VersionReconciler reconciler,
+            Set<File> reachableBuildFiles) throws java.io.IOException {
         if (versionRewrites.isEmpty()) {
             return;
         }
-        List<VersionRewriter.Edit> edits = VersionRewriter.plan(rootDir, versionRewrites, reconciler);
+        List<VersionRewriter.Edit> edits = VersionRewriter
+                .plan(rootDir, versionRewrites, reconciler, reachableBuildFiles);
         if (edits.isEmpty()) {
             logger.info(
                     "No rewritable version definition site found for the computed version(s); "

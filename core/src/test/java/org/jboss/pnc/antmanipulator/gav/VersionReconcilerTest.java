@@ -7,7 +7,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Properties;
+import java.util.Set;
 
 import org.jboss.pnc.antmanipulator.gav.VersionReconciler.Resolution;
 import org.junit.jupiter.api.Test;
@@ -168,5 +171,59 @@ class VersionReconcilerTest {
         Resolution r = forBuild(dir, build).reconcile("@VERSION@");
 
         assertThat(r.getResolved()).containsExactly("2.0.0");
+    }
+
+    // ---- unreferenced nested build.xml exclusion (GitHub issue #44) ----
+
+    @Test
+    void definitionInUnreferencedNestedBuildDirIsExcludedWhenHierarchyKnown(@TempDir Path dir) throws IOException {
+        // Mirrors Apache Commons Net's abandoned proposal/ftp2: a self-contained Ant project (its own
+        // build.xml) bundled in the tree but never executed from the root. Its filter definitions must
+        // not leak into reconciling some other, real coordinate's token.
+        File build = write(dir, "build.xml", "<project name=\"p\"/>");
+        Files.createDirectories(dir.resolve("proposal/ftp2"));
+        write(dir.resolve("proposal/ftp2"), "build.xml", "<project name=\"ftp2\"/>");
+        write(
+                dir.resolve("proposal/ftp2"),
+                "project.xml",
+                "<project><filter token=\"VERSION\" value=\"9.9.9\"/></project>");
+        Set<File> reachable = Collections.singleton(build.getCanonicalFile()); // only the root was crawled
+
+        Resolution r = VersionReconciler.forTree(dir.toFile(), build, new Properties(), reachable)
+                .reconcile("@VERSION@");
+
+        assertThat(r.isUnresolved()).isTrue();
+    }
+
+    @Test
+    void definitionInReferencedNestedBuildDirIsIncluded(@TempDir Path dir) throws IOException {
+        File build = write(dir, "build.xml", "<project name=\"p\"/>");
+        Files.createDirectories(dir.resolve("sub"));
+        File subBuild = write(dir.resolve("sub"), "build.xml", "<project name=\"sub\"/>");
+        write(dir.resolve("sub"), "publish.xml", "<project><filter token=\"VERSION\" value=\"9.9.9\"/></project>");
+        Set<File> reachable = new LinkedHashSet<>();
+        reachable.add(build.getCanonicalFile());
+        reachable.add(subBuild.getCanonicalFile());
+
+        Resolution r = VersionReconciler.forTree(dir.toFile(), build, new Properties(), reachable)
+                .reconcile("@VERSION@");
+
+        assertThat(r.getResolved()).containsExactly("9.9.9");
+    }
+
+    @Test
+    void nullReachableSetStillCollectsFromUnreferencedNestedBuildDir(@TempDir Path dir) throws IOException {
+        // The 2-/3-arg overloads (hierarchy not crawled) must keep today's behaviour: scan everything.
+        File build = write(dir, "build.xml", "<project name=\"p\"/>");
+        Files.createDirectories(dir.resolve("proposal/ftp2"));
+        write(dir.resolve("proposal/ftp2"), "build.xml", "<project name=\"ftp2\"/>");
+        write(
+                dir.resolve("proposal/ftp2"),
+                "project.xml",
+                "<project><filter token=\"VERSION\" value=\"9.9.9\"/></project>");
+
+        Resolution r = forBuild(dir, build).reconcile("@VERSION@");
+
+        assertThat(r.getResolved()).containsExactly("9.9.9");
     }
 }
