@@ -150,15 +150,34 @@ public final class PmeAlignmentReport {
         if (isBlank(artifact.getGroupId()) || isBlank(artifact.getArtifactId())) {
             return null;
         }
+        return originalVersionOf(concreteCandidates(artifact, reconciler));
+    }
+
+    /**
+     * The primary version's concrete candidates: every value a tokenised primary reconciles to, or the primary
+     * itself (as a singleton) when it's already concrete. Empty when the artifact has no usable primary version,
+     * or when a tokenised primary does not resolve. Shared by {@link #build} and {@link #buildUnchanged} so the
+     * tokenised-candidate resolution lives in one place.
+     */
+    private static Set<String> concreteCandidates(CorrelatedGav artifact, VersionReconciler reconciler) {
         String primary = artifact.primaryVersion();
         if (primary == null) {
-            return null;
+            return Collections.emptySet();
         }
-        if (!artifact.tokenizedVersions().contains(primary)) {
-            return primary;
-        }
-        Set<String> resolved = reconciler.reconcile(primary).getResolved();
-        return resolved.isEmpty() ? null : new TreeSet<>(resolved).first();
+        return artifact.tokenizedVersions().contains(primary)
+                ? reconciler.reconcile(primary).getResolved()
+                : Collections.singleton(primary);
+    }
+
+    /**
+     * The deterministic, release-preferring "original version" for a set of concrete {@code candidates}: their
+     * lexicographic minimum, or {@code null} when there are none. This prefers a release-looking candidate over
+     * e.g. its {@code -SNAPSHOT} sibling, since a release version string is always a lexicographic prefix (and so
+     * the minimum) of that sibling. Shared by {@link #build} and {@link #buildUnchanged} so the tie-break can't
+     * silently diverge between the "changed" and "unchanged" report paths.
+     */
+    private static String originalVersionOf(Set<String> candidates) {
+        return candidates.isEmpty() ? null : new TreeSet<>(candidates).first();
     }
 
     private static boolean isBlank(String s) {
@@ -195,15 +214,9 @@ public final class PmeAlignmentReport {
             CorrelatedGav artifact,
             VersionReconciler reconciler,
             Map<String, String> versionRewrites) {
-        String primary = artifact.primaryVersion();
-        if (primary == null) {
-            return null;
-        }
-        Set<String> candidates = artifact.tokenizedVersions().contains(primary)
-                ? reconciler.reconcile(primary).getResolved()
-                : Collections.singleton(primary);
+        Set<String> candidates = concreteCandidates(artifact, reconciler);
         if (candidates.isEmpty()) {
-            return null; // unresolved
+            return null; // no usable primary version, or unresolved
         }
 
         Set<String> newVersions = new LinkedHashSet<>();
@@ -218,9 +231,7 @@ public final class PmeAlignmentReport {
         }
 
         String newVersion = newVersions.iterator().next();
-        // Deterministic, and prefers a release-looking candidate over e.g. its "-SNAPSHOT" sibling, since a
-        // release version string is always a lexicographic prefix (and so the minimum) of that sibling.
-        String originalVersion = new TreeSet<>(candidates).first();
+        String originalVersion = originalVersionOf(candidates);
         return newVersion.equals(originalVersion) ? null : new Realignment(originalVersion, newVersion);
     }
 
