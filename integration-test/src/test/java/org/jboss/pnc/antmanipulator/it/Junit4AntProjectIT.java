@@ -243,7 +243,7 @@ class Junit4AntProjectIT {
         daServer = stubFirstBuildDaServer();
 
         // PME accepts an empty suffix (a bare counter), but VersionIncrementer cannot produce that form,
-        // so an empty value is rejected up front rather than emitting malformed versions.
+        // so an empty value is rejected before the DA lookup rather than emitting malformed versions.
         int exitCode = new Cli().run(
                 new String[] {
                         "-f",

@@ -168,17 +168,6 @@ public class Cli implements Callable<Integer> {
         // Versioning is opt-in, as in PME's VersioningState.isEnabled(): the project version is only modified
         // when versionModification is not false AND a versioning option is configured. There is no default suffix.
         final boolean versionModification = boolProp(PROP_VERSION_MODIFICATION, true) && isVersioningRequested();
-        if (versionModification && isBlank(properties.getProperty(PROP_VERSION_INCREMENTAL_SUFFIX))) {
-            // PME accepts an empty suffix (a bare counter, e.g. 1.2.0 -> 1.2.0.3), but VersionIncrementer cannot
-            // produce or recognise that form, so fail fast rather than emit malformed versions or hide a likely
-            // mistake such as an empty templated value.
-            logger.error(
-                    "{} is set but empty; an empty suffix is not supported. Provide a value (e.g. -D{}=redhat) "
-                            + "or omit the property.",
-                    PROP_VERSION_INCREMENTAL_SUFFIX,
-                    PROP_VERSION_INCREMENTAL_SUFFIX);
-            return 10;
-        }
 
         // Groovy scripts (-DgroovyScripts=...), as in PME/GME: FIRST-stage scripts run before anything is read,
         // so they may edit build files on disk; LAST-stage scripts run after the versions are rewritten.
@@ -315,6 +304,29 @@ public class Cli implements Callable<Integer> {
                         PROP_VERSION_MODIFICATION,
                         PROP_VERSION_INCREMENTAL_SUFFIX);
             } else if (translator != null) {
+                // Build the incrementer before the DA round-trip so an unusable suffix fails before any lookup.
+                // PME accepts an empty suffix (a bare counter, e.g. 1.2.0 -> 1.2.0.3), but VersionIncrementer
+                // cannot produce or recognise that form, so it rejects it rather than emit malformed versions or
+                // hide a likely mistake such as an empty templated value.
+                final int padding = intProp(
+                        PROP_VERSION_INCREMENTAL_SUFFIX_PADDING,
+                        VersionIncrementer.DEFAULT_PADDING);
+                final VersionIncrementer incrementer;
+                try {
+                    incrementer = new VersionIncrementer(
+                            properties.getProperty(PROP_VERSION_INCREMENTAL_SUFFIX),
+                            padding,
+                            false,
+                            properties.getProperty(PROP_VERSION_SUFFIX_STRIP, VersionIncrementer.DEFAULT_DEV_MARKERS));
+                } catch (IllegalArgumentException e) {
+                    logger.error(
+                            "Invalid {}: {} Provide a value (e.g. -D{}=redhat) or omit the property.",
+                            PROP_VERSION_INCREMENTAL_SUFFIX,
+                            e.getMessage(),
+                            PROP_VERSION_INCREMENTAL_SUFFIX);
+                    return 10;
+                }
+
                 List<ProjectVersionRef> coordinates = concreteCoordinates(gavs, reconciler);
                 if (coordinates.isEmpty()) {
                     logger.warn("No concrete coordinates to align; skipping lookup.");
@@ -327,12 +339,6 @@ public class Cli implements Callable<Integer> {
                         logger.error("DA lookup failed: {}", e.getMessage(), e);
                         return 10;
                     }
-                    VersionIncrementer incrementer = new VersionIncrementer(
-                            properties.getProperty(PROP_VERSION_INCREMENTAL_SUFFIX),
-                            intProp(PROP_VERSION_INCREMENTAL_SUFFIX_PADDING, VersionIncrementer.DEFAULT_PADDING),
-                            false,
-                            properties.getProperty(PROP_VERSION_SUFFIX_STRIP, VersionIncrementer.DEFAULT_DEV_MARKERS));
-
                     logger.info("Computed publish version(s) for {} coordinate(s):", coordinates.size());
                     for (ProjectVersionRef g : coordinates) {
                         String daLatest = latest.get(g); // null when DA has no prior build

@@ -7,6 +7,9 @@ import org.jboss.pnc.antmanipulator.align.VersionIncrementer.Result;
 import org.jboss.pnc.mavenmanipulator.common.exception.ManipulationException;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Unit tests for {@link VersionIncrementer}. These lock in the two branches (first build, which delegates
@@ -313,6 +316,15 @@ class VersionIncrementerTest {
 
             assertThat(custom.nextVersion("1.0.0", null).getNewVersion())
                     .isEqualTo("1.0.0.redhat-00001");
+        }
+
+        @ParameterizedTest
+        @NullAndEmptySource
+        @ValueSource(strings = { " ", "\t" })
+        void rejectsNullOrBlankSuffix(String suffix) {
+            assertThatThrownBy(() -> new VersionIncrementer(suffix, 5))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("suffix");
         }
     }
 

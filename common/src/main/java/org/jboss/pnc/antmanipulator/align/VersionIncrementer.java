@@ -71,6 +71,10 @@ public final class VersionIncrementer {
     }
 
     /**
+     * @param suffixBase the rebuild suffix (e.g. {@code redhat}); must be non-blank — there is no default, and an
+     *        empty suffix (PME's bare-counter form) is not supported
+     * @param padding zero-padding width of the rebuild serial (e.g. {@code 5} gives {@code 00001}); values
+     *        {@code <= 0} fall back to {@link #DEFAULT_PADDING}
      * @param preserveSnapshot PME's {@code versionSuffixSnapshot}: when {@code true}, a stripped
      *        {@code -SNAPSHOT} is re-appended at the very end (after the rebuild
      *        number), e.g. {@code 12.0.0-M1-redhat-00001-SNAPSHOT}; when {@code false}
@@ -78,8 +82,12 @@ public final class VersionIncrementer {
      * @param devMarkers comma-separated development markers to strip like SNAPSHOT (dropped, never
      *        re-appended); e.g. {@code dev} turns {@code 10.1.0-dev} into base {@code 10.1.0}. {@code null}
      *        or blank disables dev stripping.
+     * @throws IllegalArgumentException if {@code suffixBase} is null or blank
      */
     public VersionIncrementer(String suffixBase, int padding, boolean preserveSnapshot, String devMarkers) {
+        if (suffixBase == null || suffixBase.trim().isEmpty()) {
+            throw new IllegalArgumentException("the version suffix must not be null or empty.");
+        }
         this.suffixBase = suffixBase;
         this.padding = padding > 0 ? padding : DEFAULT_PADDING;
         this.preserveSnapshot = preserveSnapshot;
