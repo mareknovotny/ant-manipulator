@@ -3,9 +3,12 @@ package org.jboss.pnc.antmanipulator.cli;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -83,6 +86,19 @@ public class BuildFileScanner {
      * @throws IOException if the root file cannot be canonicalised
      */
     public ScanResult crawl(final File root) throws IOException {
+        return crawl(root, (Properties) null);
+    }
+
+    /**
+     * Crawl the build-file hierarchy starting at {@code root}, expanding property references
+     * with the given user properties and properties evaluated from build files.
+     *
+     * @param root the execution-root build file (the analogue of PME's execution-root POM)
+     * @param properties CLI or user properties passed to the build, or {@code null}
+     * @return the discovered hierarchy and any references that could not be followed
+     * @throws IOException if the root file cannot be canonicalised
+     */
+    public ScanResult crawl(final File root, final Properties properties) throws IOException {
         final File canonicalRoot = root.getCanonicalFile();
         final String topDir = canonicalRoot.getParentFile().getCanonicalPath();
 
@@ -95,6 +111,13 @@ public class BuildFileScanner {
         final Set<File> seen = new LinkedHashSet<>();
         pending.add(canonicalRoot);
 
+        final Map<String, String> initialProps = new LinkedHashMap<>();
+        if (properties != null) {
+            for (String name : properties.stringPropertyNames()) {
+                initialProps.put(name, properties.getProperty(name));
+            }
+        }
+
         while (!pending.isEmpty()) {
             final File current = pending.removeFirst();
             if (!seen.add(current)) {
@@ -105,7 +128,7 @@ public class BuildFileScanner {
 
             final RawBuildFilePeek peek;
             try {
-                peek = RawBuildFilePeek.peek(current);
+                peek = RawBuildFilePeek.peek(current, initialProps);
             } catch (Exception e) {
                 logger.warn("Failed to peek at build file {}: {}", current, e.getMessage());
                 continue;

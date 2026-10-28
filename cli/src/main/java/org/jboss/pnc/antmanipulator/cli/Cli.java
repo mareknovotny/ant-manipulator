@@ -195,7 +195,7 @@ public class Cli implements Callable<Integer> {
         // treated as part of this build.
         final BuildFileScanner.ScanResult scan;
         try {
-            scan = new BuildFileScanner().crawl(buildFile);
+            scan = new BuildFileScanner().crawl(buildFile, properties);
 
             logger.info("Discovered {} build file(s) in the hierarchy:", scan.getPeeks().size());
             for (RawBuildFilePeek peek : scan.getPeeks()) {
