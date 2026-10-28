@@ -9,7 +9,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -297,6 +296,6 @@ class Junit4AntProjectIT {
     }
 
     private static String readFile(File file) throws IOException {
-        return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+        return Files.readString(file.toPath());
     }
 }

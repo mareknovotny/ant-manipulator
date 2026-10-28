@@ -60,8 +60,8 @@ class GroovyScriptIT {
                 HEADER + "@InvocationPoint(invocationPoint = InvocationStage.FIRST)\n"
                         + "@AMEBaseScript BaseScript ame\n"
                         + "def f = ame.getBuildFile()\n"
-                        + "f.text = f.text.replace('name=\"IMPL_VERSION\" value=\"1.9.11\"', "
-                        + "'name=\"IMPL_VERSION\" value=\"1.9.12\"')\n");
+                        + "f.text = f.text.replace(/name=\"IMPL_VERSION\" value=\"1.9.11\"/, "
+                        + "/name=\"IMPL_VERSION\" value=\"1.9.12\"/)\n");
         Path last = projectDir.resolve("last.groovy");
         write(
                 last,

@@ -47,7 +47,7 @@ The build is a multi-module Maven reactor, mirroring PME's structure:
 
 ## Requirements
 
-- **JDK 17+** to build (Spotless 2.44.x requires Java 17; the compile target is Java 8, matching PME)
+- **JDK 17+** to build (Spotless requires Java 17). Code (main and test) targets Java 11.
 - Maven 3.8+
 
 ## Building

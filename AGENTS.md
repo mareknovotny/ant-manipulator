@@ -33,10 +33,10 @@ package). End-to-end tests belong in `integration-test`.
 ## Build & test
 
 - **JDK 17+** is required to build (Spotless 3.4.0 requires Java 17+ to run), even though the
-  **compile target is Java 8** (`maven.compiler.release=8`, matching PME) — don't use language
-  features newer than Java 8 in `main` sources.
-  - Note: `CONTRIBUTING.md` still says "JDK 11 or later" — that's stale; trust `README.md`
-    (`JDK 17+`) and the `bdc349e` commit that bumped Spotless.
+  **compile target is Java 11** (`maven.compiler.release=11`; reqour, which runs this tool, defaults to
+  Java 11) — don't use language features or APIs newer than Java 11 in `main` sources.
+  - **Test sources also target Java 11** (no separate `testRelease`), so no text blocks in tests either.
+    Write multi-line fixtures as concatenated string literals.
 - Maven 3.8+.
 
 ```bash

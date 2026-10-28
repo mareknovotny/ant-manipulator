@@ -3,9 +3,9 @@ package org.jboss.pnc.antmanipulator.report;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.File;
-import java.util.Arrays;
-import java.util.Collections;
+import java.nio.file.Files;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.jboss.pnc.antmanipulator.gav.GavCorrelator;
@@ -37,7 +37,7 @@ class PmeAlignmentReportTest {
     void reportsOnlyRealignedArtifacts() {
         File buildFile = new File(tempDir, "build.xml");
         GavCorrelator.Result correlated = correlator.correlate(
-                Arrays.asList(
+                List.of(
                         new ResolvedGav(
                                 "org.acme",
                                 "widget",
@@ -73,7 +73,7 @@ class PmeAlignmentReportTest {
         File buildFile = new File(tempDir, "build.xml");
         File otherFile = new File(tempDir, "ivy.xml");
         GavCorrelator.Result correlated = correlator.correlate(
-                Arrays.asList(
+                List.of(
                         new ResolvedGav(
                                 "org.acme",
                                 "gadget",
@@ -107,7 +107,7 @@ class PmeAlignmentReportTest {
     void emptyWhenNothingRealigned() {
         File buildFile = new File(tempDir, "build.xml");
         GavCorrelator.Result correlated = correlator.correlate(
-                Collections.singletonList(
+                List.of(
                         new ResolvedGav(
                                 "org.acme",
                                 "widget",
@@ -117,7 +117,7 @@ class PmeAlignmentReportTest {
                                 SourceKind.POM_TEMPLATE,
                                 Confidence.HIGH)));
 
-        PME report = PmeAlignmentReport.build(buildFile, correlated, reconciler(), Collections.emptyMap());
+        PME report = PmeAlignmentReport.build(buildFile, correlated, reconciler(), Map.of());
 
         assertThat(report.getModules()).isEmpty();
         assertThat(report.getGav().getGroupId()).isNull();
@@ -127,7 +127,7 @@ class PmeAlignmentReportTest {
     void buildUnchangedReportsExecutionRootAtDeclaredVersion() {
         File buildFile = new File(tempDir, "build.xml");
         GavCorrelator.Result correlated = correlator.correlate(
-                Collections.singletonList(
+                List.of(
                         new ResolvedGav(
                                 "org.acme",
                                 "widget",
@@ -152,7 +152,7 @@ class PmeAlignmentReportTest {
     void writeToProducesPmeShapedJson() throws Exception {
         File buildFile = new File(tempDir, "build.xml");
         GavCorrelator.Result correlated = correlator.correlate(
-                Collections.singletonList(
+                List.of(
                         new ResolvedGav(
                                 "org.acme",
                                 "widget",
@@ -161,13 +161,13 @@ class PmeAlignmentReportTest {
                                 "detail",
                                 SourceKind.POM_TEMPLATE,
                                 Confidence.HIGH)));
-        Map<String, String> versionRewrites = Collections.singletonMap("1.0", "1.0.redhat-00001");
+        Map<String, String> versionRewrites = Map.of("1.0", "1.0.redhat-00001");
 
         PME report = PmeAlignmentReport.build(buildFile, correlated, reconciler(), versionRewrites);
         File out = new File(tempDir, "alignmentReport.json");
         PmeAlignmentReport.writeTo(report, out);
 
-        String json = new String(java.nio.file.Files.readAllBytes(out.toPath()));
+        String json = Files.readString(out.toPath());
         assertThat(json).contains("\"executionRoot\"").contains("\"modules\"").contains("org.acme");
     }
 }

@@ -2,8 +2,6 @@ package org.jboss.pnc.antmanipulator.gav;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 import org.jboss.pnc.antmanipulator.gav.GavCorrelator.Result;
@@ -27,7 +25,7 @@ class GavCorrelatorTest {
     @Test
     void groupsFindingsByGroupAndArtifact() {
         Result r = correlator.correlate(
-                Arrays.asList(
+                List.of(
                         gav("org.acme", "widget", "1.0", SourceKind.POM_TEMPLATE, Confidence.HIGH),
                         gav("org.acme", "widget", "1.0", SourceKind.IVY, Confidence.MEDIUM),
                         gav("org.acme", "gadget", "2.0", SourceKind.POM_TEMPLATE, Confidence.HIGH)));
@@ -42,7 +40,7 @@ class GavCorrelatorTest {
     @Test
     void findingsWithoutGaBecomeProjectVersionCandidates() {
         Result r = correlator.correlate(
-                Arrays.asList(
+                List.of(
                         gav(null, null, "3.1", SourceKind.PROPERTY, Confidence.LOW),
                         gav(null, null, "1.9", SourceKind.MANIFEST, Confidence.LOW),
                         gav("org.acme", "widget", "1.0", SourceKind.POM_TEMPLATE, Confidence.HIGH)));
@@ -56,7 +54,7 @@ class GavCorrelatorTest {
     @Test
     void detectsConcreteVersionConflict() {
         Result r = correlator.correlate(
-                Arrays.asList(
+                List.of(
                         gav("org.acme", "widget", "1.0", SourceKind.POM_TEMPLATE, Confidence.HIGH),
                         gav("org.acme", "widget", "2.0", SourceKind.IVY, Confidence.MEDIUM)));
 
@@ -70,7 +68,7 @@ class GavCorrelatorTest {
     void tokenisedVersionsDoNotCountAsConflicts() {
         // A concrete version alongside a tokenised one is not a conflict — the token isn't a rival value.
         Result r = correlator.correlate(
-                Arrays.asList(
+                List.of(
                         gav("org.acme", "widget", "1.0", SourceKind.POM_TEMPLATE, Confidence.HIGH),
                         gav("org.acme", "widget", "@VERSION@", SourceKind.POM_TEMPLATE, Confidence.HIGH)));
 
@@ -84,7 +82,7 @@ class GavCorrelatorTest {
     @Test
     void bestConfidenceIsTheHighest() {
         Result r = correlator.correlate(
-                Arrays.asList(
+                List.of(
                         gav("org.acme", "widget", "1.0", SourceKind.PROPERTY, Confidence.LOW),
                         gav("org.acme", "widget", "1.0", SourceKind.POM_TEMPLATE, Confidence.HIGH)));
 
@@ -94,7 +92,7 @@ class GavCorrelatorTest {
     @Test
     void primaryVersionPrefersHighestConfidenceConcreteVersion() {
         Result r = correlator.correlate(
-                Arrays.asList(
+                List.of(
                         gav("org.acme", "widget", "9.9", SourceKind.PROPERTY, Confidence.LOW),
                         gav("org.acme", "widget", "1.0", SourceKind.POM_TEMPLATE, Confidence.HIGH)));
 
@@ -104,7 +102,7 @@ class GavCorrelatorTest {
     @Test
     void primaryVersionFallsBackToTokenWhenNoConcreteVersion() {
         Result r = correlator.correlate(
-                Collections.singletonList(
+                List.of(
                         gav("org.acme", "widget", "@VERSION@", SourceKind.POM_TEMPLATE, Confidence.HIGH)));
 
         assertThat(r.getArtifacts().get(0).primaryVersion()).isEqualTo("@VERSION@");
@@ -112,7 +110,7 @@ class GavCorrelatorTest {
 
     @Test
     void handlesEmptyInput() {
-        Result r = correlator.correlate(Collections.emptyList());
+        Result r = correlator.correlate(List.of());
 
         assertThat(r.getArtifacts()).isEmpty();
         assertThat(r.getProjectVersionCandidates()).isEmpty();
@@ -121,7 +119,7 @@ class GavCorrelatorTest {
 
     @Test
     void summarizeFlagsConflict() {
-        List<ResolvedGav> findings = Arrays.asList(
+        List<ResolvedGav> findings = List.of(
                 gav("org.acme", "widget", "1.0", SourceKind.POM_TEMPLATE, Confidence.HIGH),
                 gav("org.acme", "widget", "2.0", SourceKind.IVY, Confidence.MEDIUM));
         CorrelatedGav widget = correlator.correlate(findings).getArtifacts().get(0);

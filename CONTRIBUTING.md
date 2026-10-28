@@ -5,8 +5,8 @@ test, and format the project, and the conventions we follow.
 
 ## Requirements
 
-- **JDK 17 or later** to build. Like pom-manipulation-ext, the compiler target is Java 8
-  (`maven.compiler.release=8`), so source must not use APIs newer than Java 8.
+- **JDK 17 or later** to build. The compiler target is Java 11 (`maven.compiler.release=11`), so
+  source (main **and** test) must not use language features or APIs newer than Java 11.
 - **Maven 3.8+**.
 
 ## Building
