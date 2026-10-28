@@ -104,6 +104,77 @@ class PmeAlignmentReportTest {
     }
 
     @Test
+    void executionRootPrefersSiblingInRootDirectoryOverSubdirectoryArtifact() {
+        File buildFile = new File(tempDir, "build.xml");
+        File rootProjectXml = new File(tempDir, "project.xml");
+        File subDir = new File(tempDir, "sub");
+        File subBuild = new File(subDir, "build.xml");
+
+        GavCorrelator.Result correlated = correlator.correlate(
+                List.of(
+                        new ResolvedGav(
+                                "org.acme",
+                                "a-child",
+                                "1.0",
+                                subBuild,
+                                "detail",
+                                SourceKind.MAVEN1_POM,
+                                Confidence.HIGH),
+                        new ResolvedGav(
+                                "org.acme",
+                                "z-root",
+                                "2.0",
+                                rootProjectXml,
+                                "detail",
+                                SourceKind.MAVEN1_POM,
+                                Confidence.HIGH)));
+
+        Map<String, String> versionRewrites = new LinkedHashMap<>();
+        versionRewrites.put("1.0", "1.0.redhat-00001");
+        versionRewrites.put("2.0", "2.0.redhat-00001");
+
+        PME report = PmeAlignmentReport.build(buildFile, correlated, reconciler(), versionRewrites);
+
+        assertThat(report.getModules()).hasSize(2);
+        assertThat(report.getGav().getArtifactId()).isEqualTo("z-root");
+        assertThat(report.getGav().getOriginalGAV()).isEqualTo("org.acme:z-root:2.0");
+        assertThat(report.getGav().getVersion()).isEqualTo("2.0.redhat-00001");
+    }
+
+    @Test
+    void buildUnchangedPrefersSiblingInRootDirectoryOverSubdirectoryArtifact() {
+        File buildFile = new File(tempDir, "build.xml");
+        File rootProjectXml = new File(tempDir, "project.xml");
+        File subDir = new File(tempDir, "sub");
+        File subBuild = new File(subDir, "build.xml");
+
+        GavCorrelator.Result correlated = correlator.correlate(
+                List.of(
+                        new ResolvedGav(
+                                "org.acme",
+                                "a-child",
+                                "1.0",
+                                subBuild,
+                                "detail",
+                                SourceKind.MAVEN1_POM,
+                                Confidence.HIGH),
+                        new ResolvedGav(
+                                "org.acme",
+                                "z-root",
+                                "2.0",
+                                rootProjectXml,
+                                "detail",
+                                SourceKind.MAVEN1_POM,
+                                Confidence.HIGH)));
+
+        PME report = PmeAlignmentReport.buildUnchanged(buildFile, correlated, reconciler());
+
+        assertThat(report.getGav().getArtifactId()).isEqualTo("z-root");
+        assertThat(report.getGav().getOriginalGAV()).isEqualTo("org.acme:z-root:2.0");
+        assertThat(report.getGav().getVersion()).isEqualTo("2.0");
+    }
+
+    @Test
     void emptyWhenNothingRealigned() {
         File buildFile = new File(tempDir, "build.xml");
         GavCorrelator.Result correlated = correlator.correlate(

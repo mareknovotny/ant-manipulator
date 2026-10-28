@@ -36,6 +36,12 @@ import org.slf4j.LoggerFactory;
  */
 public final class PmeAlignmentReport {
 
+    private enum DeclarationScope {
+        ROOT_FILE,
+        ROOT_DIR,
+        OTHER
+    }
+
     private static final Logger logger = LoggerFactory.getLogger(PmeAlignmentReport.class);
 
     private PmeAlignmentReport() {
@@ -55,7 +61,8 @@ public final class PmeAlignmentReport {
             Map<String, String> versionRewrites) {
 
         PME report = new PME();
-        ModulesItem executionRootModule = null;
+        ModulesItem rootFileModule = null;
+        ModulesItem rootDirModule = null;
 
         for (CorrelatedGav artifact : correlated.getArtifacts()) {
             Realignment realignment = realignmentOf(artifact, reconciler, versionRewrites);
@@ -72,14 +79,19 @@ public final class PmeAlignmentReport {
                     .setPVR(new SimpleProjectVersionRef(artifact.getGroupId(), artifact.getArtifactId(), newVersion));
             report.getModules().add(module);
 
-            if (executionRootModule == null && isDeclaredIn(artifact, rootBuildFile)) {
-                executionRootModule = module;
+            DeclarationScope scope = declarationScope(artifact, rootBuildFile);
+            if (scope == DeclarationScope.ROOT_FILE && rootFileModule == null) {
+                rootFileModule = module;
+            } else if (scope == DeclarationScope.ROOT_DIR && rootDirModule == null) {
+                rootDirModule = module;
             }
         }
 
-        if (executionRootModule == null && !report.getModules().isEmpty()) {
-            executionRootModule = report.getModules().get(0);
-        }
+        ModulesItem executionRootModule = rootFileModule != null
+                ? rootFileModule
+                : (rootDirModule != null
+                        ? rootDirModule
+                        : (report.getModules().isEmpty() ? null : report.getModules().get(0)));
         if (executionRootModule != null) {
             report.getGav().setOriginalGAV(executionRootModule.getGav().getOriginalGAV());
             report.getGav().setPVR(executionRootModule.getGav().getPVR());
@@ -92,8 +104,9 @@ public final class PmeAlignmentReport {
      * Builds a report for a run with version modification disabled ({@code -DversionModification=false}): nothing
      * was realigned, so there are no module entries, but PNC/Repour still needs the execution root's coordinate
      * to record and tag the build — under its <em>declared</em> (unchanged) version. The execution root is chosen
-     * exactly as {@link #build} does (an artifact declared in the root build file, else the first concrete one by
-     * groupId:artifactId order) and reported with its original version as both the before and after value.
+     * exactly as {@link #build} does (an artifact declared in the root build file or root directory, else the first
+     * concrete one by groupId:artifactId order) and reported with its original version as both the before and after
+     * value.
      *
      * @param rootBuildFile the build file passed to {@code -f}, used to pick the {@code executionRoot} artifact
      * @param correlated every artifact this run discovered, correlated by groupId:artifactId
@@ -106,24 +119,38 @@ public final class PmeAlignmentReport {
             VersionReconciler reconciler) {
 
         PME report = new PME();
-        CorrelatedGav executionRoot = null;
-        String executionRootVersion = null;
+        CorrelatedGav rootFileArtifact = null;
+        String rootFileVersion = null;
+        CorrelatedGav rootDirArtifact = null;
+        String rootDirVersion = null;
+        CorrelatedGav fallbackRoot = null;
+        String fallbackRootVersion = null;
 
         for (CorrelatedGav artifact : correlated.getArtifacts()) {
             String version = concreteVersionOf(artifact, reconciler);
             if (version == null) {
                 continue;
             }
-            if (executionRoot == null) {
-                executionRoot = artifact; // fallback: first concrete artifact, in groupId:artifactId order
-                executionRootVersion = version;
+            if (fallbackRoot == null) {
+                fallbackRoot = artifact; // fallback: first concrete artifact, in groupId:artifactId order
+                fallbackRootVersion = version;
             }
-            if (isDeclaredIn(artifact, rootBuildFile)) {
-                executionRoot = artifact; // prefer one actually declared in the root build file
-                executionRootVersion = version;
-                break;
+            DeclarationScope scope = declarationScope(artifact, rootBuildFile);
+            if (scope == DeclarationScope.ROOT_FILE && rootFileArtifact == null) {
+                rootFileArtifact = artifact;
+                rootFileVersion = version;
+            } else if (scope == DeclarationScope.ROOT_DIR && rootDirArtifact == null) {
+                rootDirArtifact = artifact;
+                rootDirVersion = version;
             }
         }
+
+        CorrelatedGav executionRoot = rootFileArtifact != null
+                ? rootFileArtifact
+                : (rootDirArtifact != null ? rootDirArtifact : fallbackRoot);
+        String executionRootVersion = rootFileArtifact != null
+                ? rootFileVersion
+                : (rootDirArtifact != null ? rootDirVersion : fallbackRootVersion);
 
         if (executionRoot != null) {
             report.getGav()
@@ -235,14 +262,23 @@ public final class PmeAlignmentReport {
         return newVersion.equals(originalVersion) ? null : new Realignment(originalVersion, newVersion);
     }
 
-    private static boolean isDeclaredIn(CorrelatedGav artifact, File rootBuildFile) {
+    private static DeclarationScope declarationScope(CorrelatedGav artifact, File rootBuildFile) {
         File canonicalRoot = canonical(rootBuildFile);
-        return artifact.getFindings()
-                .stream()
-                .map(ResolvedGav::getSourceFile)
-                .filter(Objects::nonNull)
-                .map(PmeAlignmentReport::canonical)
-                .anyMatch(f -> f.equals(canonicalRoot));
+        File canonicalRootDir = canonicalRoot.getParentFile();
+        boolean inRootDir = false;
+        for (ResolvedGav finding : artifact.getFindings()) {
+            File sourceFile = finding.getSourceFile();
+            if (sourceFile != null) {
+                File canonicalSource = canonical(sourceFile);
+                if (canonicalSource.equals(canonicalRoot)) {
+                    return DeclarationScope.ROOT_FILE;
+                }
+                if (canonicalRootDir != null && Objects.equals(canonicalSource.getParentFile(), canonicalRootDir)) {
+                    inRootDir = true;
+                }
+            }
+        }
+        return inRootDir ? DeclarationScope.ROOT_DIR : DeclarationScope.OTHER;
     }
 
     private static File canonical(File f) {
